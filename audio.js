@@ -11,7 +11,7 @@
   var BPM = 84;
   var BEAT = 60 / BPM;
 
-  var ctx = null, master = null, revSend = null, noiseBuf = null;
+  var ctx = null, master = null, outNode = null, revSend = null, noiseBuf = null;
   var lat = 0;
   var ready = false;
 
@@ -37,17 +37,28 @@
     ctx = new AC();
 
     master = ctx.createGain();
-    master.gain.value = 0.85;
+    master.gain.value = 0.75;
 
+    // общий смягчитель верха: снимает жёсткость хэтов и колокольчиков,
+    // не трогая тело инструментов
+    var soft = ctx.createBiquadFilter();
+    soft.type = 'highshelf';
+    soft.frequency.value = 4500;
+    soft.gain.value = -4.5;
+
+    // компрессор здесь — страховка от редких совпадений, а не эффект:
+    // при верном балансе он почти не срабатывает и не качает картину
     var comp = ctx.createDynamicsCompressor();
-    comp.threshold.value = -15;
-    comp.knee.value = 22;
-    comp.ratio.value = 3;
+    comp.threshold.value = -12;
+    comp.knee.value = 24;
+    comp.ratio.value = 4;
     comp.attack.value = 0.006;
-    comp.release.value = 0.22;
+    comp.release.value = 0.25;
 
-    master.connect(comp);
+    master.connect(soft);
+    soft.connect(comp);
     comp.connect(ctx.destination);
+    outNode = comp;
 
     var rev = makeIR(2.8, 2.5);
     revSend = ctx.createGain();
@@ -97,12 +108,13 @@
   function kick(t, v) {
     var o = ctx.createOscillator();
     o.type = 'sine';
-    o.frequency.setValueAtTime(155, t);
-    o.frequency.exponentialRampToValueAtTime(44, t + 0.11);
+    // ниже стартовая частота и мягче атака — удар без щелчка по ушам
+    o.frequency.setValueAtTime(110, t);
+    o.frequency.exponentialRampToValueAtTime(44, t + 0.14);
     var g = ctx.createGain();
-    env(g, t, v, 0.005, 0.42);
+    env(g, t, v, 0.014, 0.42);
     o.connect(g);
-    g.connect(bus(0.95, 0.06));
+    g.connect(bus(0.34, 0.06));
     o.start(t);
     o.stop(t + 0.5);
   }
@@ -111,11 +123,16 @@
     var s = noise();
     var f = ctx.createBiquadFilter();
     f.type = 'highpass';
-    f.frequency.value = 6800;
+    f.frequency.value = 4800;
+    // потолок сверху: без него хэт — чистое шило, вся энергия выше 2 кГц
+    var lp = ctx.createBiquadFilter();
+    lp.type = 'lowpass';
+    lp.frequency.value = 9000;
+    lp.Q.value = 0.5;
     var g = ctx.createGain();
-    env(g, t, v, 0.002, 0.075);
-    s.connect(f); f.connect(g);
-    g.connect(bus(0.42, 0.3));
+    env(g, t, v, 0.003, 0.065);
+    s.connect(f); f.connect(lp); lp.connect(g);
+    g.connect(bus(0.55, 0.3));
     s.start(t);
     s.stop(t + 0.12);
   }
@@ -162,7 +179,7 @@
     o2.connect(mix);
 
     o1.connect(f); mix.connect(f); f.connect(g);
-    g.connect(bus(0.62, 0.08));
+    g.connect(bus(0.34, 0.08));
     o1.start(t); o2.start(t);
     o1.stop(t + dur + 0.06); o2.stop(t + dur + 0.06);
   }
@@ -267,6 +284,8 @@
     latency: function () { return lat; },
     kick: kick, hat: hat, rim: rim, bass: bass,
     pluck: pluck, bell: bell, pad: pad,
-    confirm: confirm_, thud: thud, chord: chord
+    confirm: confirm_, thud: thud, chord: chord,
+    // точка съёма для замеров уровня и спектра при настройке
+    graph: function () { return { ctx: ctx, master: master, out: outNode }; }
   };
 })(window);
