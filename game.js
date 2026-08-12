@@ -251,18 +251,30 @@
     return t;
   }
 
-  function onPointerDown(ev) {
-    if (st.mode !== 'play') return;
-    var vx = (ev.clientX - st.ox) / st.scale;
-    var vy = (ev.clientY - st.oy) / st.scale;
-    var t = heardTimeOf(ev);
-
+  /* одна зона на клик и на курсор: иначе курсор обещает не там, где сработает */
+  function objectAt(clientX, clientY) {
+    var vx = (clientX - st.ox) / st.scale;
+    var vy = (clientY - st.oy) / st.scale;
     var target = null, best = 1e9;
     st.objs.forEach(function (o) {
       if (!o.visible) return;
       var d = Math.hypot(vx - o.x, vy - o.y);
       if (d < o.r * 1.3 && d < best) { best = d; target = o; }
     });
+    return target;
+  }
+
+  var cursorNow = '';
+  function setCursor(c) {
+    if (cursorNow === c) return;
+    cursorNow = c;
+    cv.style.cursor = c;
+  }
+
+  function onPointerDown(ev) {
+    if (st.mode !== 'play') return;
+    var t = heardTimeOf(ev);
+    var target = objectAt(ev.clientX, ev.clientY);
     if (!target) return;                     // мимо всего — без наказания
 
     var beat = beatAt(t);
@@ -378,6 +390,7 @@
 
   function toTitle() {
     saveNow();
+    setCursor('');
     st.mode = 'title';
     st.objs = [];
     el.hint.classList.remove('on');
@@ -416,6 +429,11 @@
   });
 
   cv.addEventListener('pointerdown', onPointerDown);
+
+  cv.addEventListener('pointermove', function (ev) {
+    setCursor(st.mode === 'play' && objectAt(ev.clientX, ev.clientY) ? 'grab' : '');
+  });
+  cv.addEventListener('pointerleave', function () { setCursor(''); });
 
   window.addEventListener('keydown', function (e) {
     if (e.key === 'r' || e.key === 'R' || e.key === 'к' || e.key === 'К') {
