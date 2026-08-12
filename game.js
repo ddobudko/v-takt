@@ -264,11 +264,20 @@
     return target;
   }
 
+  /* Курсор пересчитывается каждый кадр, а не только на движение мыши:
+     инструменты появляются и гаснут сами, и при неподвижной мыши курсор
+     иначе остаётся от прошлого состояния. */
+  var pointer = { x: -1, y: -1, over: false };
   var cursorNow = '';
+
   function setCursor(c) {
     if (cursorNow === c) return;
     cursorNow = c;
     cv.style.cursor = c;
+  }
+
+  function updateCursor() {
+    setCursor(st.mode === 'play' && pointer.over && objectAt(pointer.x, pointer.y) ? 'grab' : '');
   }
 
   function onPointerDown(ev) {
@@ -430,10 +439,17 @@
 
   cv.addEventListener('pointerdown', onPointerDown);
 
-  cv.addEventListener('pointermove', function (ev) {
-    setCursor(st.mode === 'play' && objectAt(ev.clientX, ev.clientY) ? 'grab' : '');
-  });
-  cv.addEventListener('pointerleave', function () { setCursor(''); });
+  function trackPointer(ev) {
+    pointer.x = ev.clientX;
+    pointer.y = ev.clientY;
+    pointer.over = true;
+  }
+  cv.addEventListener('pointermove', trackPointer);
+  cv.addEventListener('pointerover', trackPointer);
+  cv.addEventListener('pointerdown', trackPointer);
+  cv.addEventListener('mousemove', trackPointer);          // подстраховка
+  cv.addEventListener('pointerleave', function () { pointer.over = false; });
+  cv.addEventListener('mouseleave', function () { pointer.over = false; });
 
   window.addEventListener('keydown', function (e) {
     if (e.key === 'r' || e.key === 'R' || e.key === 'к' || e.key === 'К') {
@@ -676,6 +692,7 @@
     var dt = last ? Math.min(0.05, t - last) : 0;
     last = t;
     if (st.mode === 'play' && S.ready()) update(t, dt);
+    updateCursor();
     draw(t);
   }
   requestAnimationFrame(frame);

@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>втакт</title>
-<link rel="stylesheet" href="styles.css">
+<link rel="stylesheet" href="styles.css?v=7">
 </head>
 <body>
   <canvas id="stage"></canvas>
@@ -42,8 +42,9 @@
     </div>
   </div>
 
-  <script src="store.js"></script>
-  <script src="audio.js"></script>
-  <script src="game.js"></script>
+  <!-- ?v= — против кэша GitHub Pages (max-age=600): поднимать при правках -->
+  <script src="store.js?v=7"></script>
+  <script src="audio.js?v=7"></script>
+  <script src="game.js?v=7"></script>
 </body>
 </html>
