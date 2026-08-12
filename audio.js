@@ -293,6 +293,10 @@
     BPM: BPM,
     init: init,
     resume: function () { if (ctx && ctx.state !== 'running') ctx.resume(); },
+    // пауза усыпляет сам контекст: currentTime замирает, и вся ритмическая
+    // сетка вместе с ним — назначенные ноты не уезжают
+    suspend: function () { if (ctx && ctx.state === 'running') ctx.suspend(); },
+    state: function () { return ctx ? ctx.state : 'none'; },
     ready: function () { return ready; },
     ctxNow: function () { return ctx ? ctx.currentTime : 0; },
     now: function () { return ctx ? ctx.currentTime - lat : 0; },

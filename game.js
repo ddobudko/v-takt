@@ -11,9 +11,11 @@
   var PERFECT = 0.085, GOOD = 0.155;  // окна попадания, секунды
 
   var BEATS_PER_BAR = 4;
-  var LIFE = 4;          // сколько своих циклов инструмент живёт без подтверждения
+  var LIFE = 6;          // сколько своих циклов инструмент живёт без подтверждения
   var WARN = 2;          // за сколько последних циклов начинает предупреждать
-  var INTRO_BARS = 2;    // через сколько тактов входит следующий инструмент
+  var INTRO_BARS = 4;    // через сколько тактов входит следующий инструмент
+  var DORMANT_BARS = 3;  // сколько тактов выключенный ждёт на экране, потом уходит
+  var FADE = 0.8;        // появление и уход, секунды
 
   var BPM_START = 84, BPM_MIN = 66, BPM_MAX = 150;
   var BPM_UP = 0.3;      // за попадание
@@ -35,6 +37,9 @@
     bestBox: document.querySelector('.hud-best'),
     hint: document.getElementById('hint'),
     title: document.getElementById('title'),
+    pause: document.getElementById('pause'),
+    pauseResume: document.getElementById('pause-resume'),
+    pauseQuit: document.getElementById('pause-quit'),
     nameForm: document.getElementById('name-form'),
     nameInput: document.getElementById('name-input'),
     welcome: document.getElementById('welcome'),
@@ -148,6 +153,7 @@
     score: 0,
     combo: 0,
     sync: 0.25,
+    paused: false,
     player: null,
     best: 0,
     beaten: false,
@@ -168,7 +174,7 @@
         id: i, kind: c.kind, period: c.period, x: c.x, y: c.y,
         r: radiusFor(c.period),
         introBeat: i * INTRO_BARS * BEATS_PER_BAR,
-        visible: false, appearAt: 0,
+        visible: false, appearAt: 0, leavingAt: 0, dormantSince: null,
         alive: false, until: -1,
         lastPhase: 0, flash: 0, shake: 0, warnFlash: 0, ripples: []
       };
@@ -220,7 +226,7 @@
      на своей доле каждый живой инструмент играет фигуру цикла. */
 
   function schedule() {
-    if (!S.ready() || st.mode !== 'play') return;
+    if (!S.ready() || st.mode !== 'play' || st.paused) return;
     var horizon = S.ctxNow() + 0.25;
     var guard = 0;
     while (timeAt(st.cursor) < horizon && guard++ < 512) {
@@ -257,7 +263,7 @@
     var vy = (clientY - st.oy) / st.scale;
     var target = null, best = 1e9;
     st.objs.forEach(function (o) {
-      if (!o.visible) return;
+      if (!o.visible || o.leavingAt) return;      // уходящий уже не ловится
       var d = Math.hypot(vx - o.x, vy - o.y);
       if (d < o.r * 1.3 && d < best) { best = d; target = o; }
     });
@@ -277,11 +283,13 @@
   }
 
   function updateCursor() {
-    setCursor(st.mode === 'play' && pointer.over && objectAt(pointer.x, pointer.y) ? 'grab' : '');
+    var on = st.mode === 'play' && !st.paused && pointer.over &&
+             objectAt(pointer.x, pointer.y);
+    setCursor(on ? 'grab' : '');
   }
 
   function onPointerDown(ev) {
-    if (st.mode !== 'play') return;
+    if (st.mode !== 'play' || st.paused) return;
     var t = heardTimeOf(ev);
     var target = objectAt(ev.clientX, ev.clientY);
     if (!target) return;                     // мимо всего — без наказания
@@ -297,6 +305,7 @@
       var gain;
       if (!target.alive) {
         target.alive = true;
+        target.dormantSince = null;
         gain = SCORE_ON;
         INSTR[target.kind].accent(aNow, beatDur());
         S.confirm(aNow, perfect ? 0.11 : 0.07);
@@ -332,6 +341,7 @@
     o.alive = false;
     o.until = -1;
     o.shake = 1;
+    o.dormantSince = beatAt(S.now());     // отсюда пойдёт отсчёт до ухода с экрана
     st.combo = 0;
     st.errorsThisBar++;
     st.score = Math.max(0, st.score + SCORE_LOST);
@@ -397,8 +407,18 @@
     }, 1200);
   }
 
+  function setPaused(on) {
+    if (st.mode !== 'play' || st.paused === on) return;
+    st.paused = on;
+    el.pause.hidden = !on;
+    if (on) { S.suspend(); saveNow(); el.hint.classList.remove('on'); }
+    else { S.resume(); }
+  }
+
   function toTitle() {
     saveNow();
+    setPaused(false);
+    el.pause.hidden = true;
     setCursor('');
     st.mode = 'title';
     st.objs = [];
@@ -451,17 +471,24 @@
   cv.addEventListener('pointerleave', function () { pointer.over = false; });
   cv.addEventListener('mouseleave', function () { pointer.over = false; });
 
+  el.pauseResume.addEventListener('click', function () { setPaused(false); });
+  el.pauseQuit.addEventListener('click', function () { toTitle(); });
+
   window.addEventListener('keydown', function (e) {
+    if (st.mode !== 'play') return;
     if (e.key === 'r' || e.key === 'R' || e.key === 'к' || e.key === 'К') {
-      if (st.mode === 'play') { saveNow(); reset(); }
-    } else if (e.key === 'Escape') {
-      if (st.mode === 'play') toTitle();
+      saveNow();
+      setPaused(false);
+      reset();
+    } else if (e.key === 'Escape' || e.key === ' ' || e.code === 'Space') {
+      e.preventDefault();
+      setPaused(!st.paused);
     }
   });
 
   window.addEventListener('pagehide', saveNow);
   document.addEventListener('visibilitychange', function () {
-    if (document.hidden) saveNow();
+    if (document.hidden) { saveNow(); setPaused(true); }   // ушли со вкладки — не теряем состав
   });
 
   initTitle();
@@ -489,8 +516,28 @@
     var beat = beatAt(t);
 
     st.objs.forEach(function (o) {
-      if (!o.visible && beat >= o.introBeat) { o.visible = true; o.appearAt = t; }
+      if (!o.visible && beat >= o.introBeat) {
+        o.visible = true;
+        o.appearAt = t;
+        o.dormantSince = beat;
+      }
       if (!o.visible) return;
+
+      // выключенный не занимает экран вечно: уходит и предлагается снова
+      if (o.leavingAt) {
+        if (t - o.leavingAt >= FADE) {
+          o.visible = false;
+          o.leavingAt = 0;
+          o.dormantSince = null;
+          o.introBeat = beat + INTRO_BARS * BEATS_PER_BAR;
+        }
+        return;
+      }
+      if (!o.alive && o.dormantSince !== null &&
+          beat - o.dormantSince >= DORMANT_BARS * BEATS_PER_BAR) {
+        o.leavingAt = t;
+        return;
+      }
 
       // угасание: даём доиграть окно попадания последней доли-шанса
       if (o.alive && t > timeAt((o.until + 1) * o.period) + GOOD) expire(o);
@@ -580,7 +627,9 @@
     st.objs.forEach(function (o) {
       if (!o.visible) return;
       var inst = INSTR[o.kind];
-      var a = Math.min(1, (t - o.appearAt) / 0.8);          // мягкий вход
+      var a = o.leavingAt
+        ? Math.max(0, 1 - (t - o.leavingAt) / FADE)          // мягкий уход
+        : Math.min(1, (t - o.appearAt) / FADE);              // мягкий вход
       var p = beat / o.period; p = p - Math.floor(p);
       var jitter = o.shake > 0 ? Math.sin(t * 90) * o.shake * 5 : 0;
       var x = o.x + jitter, y = o.y;
@@ -691,7 +740,7 @@
     var t = S.ready() ? S.now() : 0;
     var dt = last ? Math.min(0.05, t - last) : 0;
     last = t;
-    if (st.mode === 'play' && S.ready()) update(t, dt);
+    if (st.mode === 'play' && !st.paused && S.ready()) update(t, dt);
     updateCursor();
     draw(t);
   }
