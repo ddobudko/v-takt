@@ -267,6 +267,21 @@
     s.start(t); s.stop(t + 0.2);
   }
 
+  // инструмент угас без подтверждения — тихий нисходящий вздох, не упрёк
+  function expire(t) {
+    [[0, 62], [0.1, 57]].forEach(function (n) {
+      var o = ctx.createOscillator();
+      o.type = 'sine';
+      o.frequency.value = midi(n[1]);
+      var g = ctx.createGain();
+      env(g, t + n[0], 0.05, 0.012, 0.55);
+      o.connect(g);
+      g.connect(bus(0.4, 0.55));
+      o.start(t + n[0]);
+      o.stop(t + n[0] + 0.6);
+    });
+  }
+
   function chord(t, notes, v) {
     notes.forEach(function (m, i) {
       bell(t + i * 0.06, m, v || 0.12);
@@ -284,7 +299,7 @@
     latency: function () { return lat; },
     kick: kick, hat: hat, rim: rim, bass: bass,
     pluck: pluck, bell: bell, pad: pad,
-    confirm: confirm_, thud: thud, chord: chord,
+    confirm: confirm_, thud: thud, chord: chord, expire: expire,
     // точка съёма для замеров уровня и спектра при настройке
     graph: function () { return { ctx: ctx, master: master, out: outNode }; }
   };

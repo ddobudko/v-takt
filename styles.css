@@ -41,12 +41,29 @@ body {
   transition: opacity 0.6s ease;
 }
 
-.hud-level { top: 28px; left: 32px; }
+.hud-score { top: 28px; left: 32px; }
+.hud-tempo { top: 28px; right: 32px; }
 .hud-keys  { bottom: 26px; right: 32px; opacity: 0.5; }
+
+.hud-score, .hud-tempo {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+}
+
+.hud-cap { color: #b8b5ad; }
+
+.hud-num {
+  font-size: 20px;
+  font-weight: 300;
+  letter-spacing: 0.08em;
+  color: #4e4c46;
+  font-variant-numeric: tabular-nums;
+}
 
 .hint {
   position: absolute;
-  bottom: 84px;
+  bottom: 52px;
   left: 0;
   right: 0;
   text-align: center;
@@ -57,42 +74,6 @@ body {
   transition: opacity 1s ease;
 }
 .hint.on { opacity: 1; }
-
-.hud-dots {
-  position: absolute;
-  bottom: 48px;
-  left: 0;
-  right: 0;
-  display: flex;
-  gap: 9px;
-  justify-content: center;
-  align-items: center;
-}
-
-.dot {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  border: 1px solid rgba(0, 0, 0, 0.18);
-  background: transparent;
-  transition: background 0.45s ease, border-color 0.45s ease, transform 0.45s cubic-bezier(.2,1.4,.4,1);
-}
-.dot.on { transform: scale(1.35); border-color: transparent; }
-
-.caption {
-  position: absolute;
-  bottom: 88px;
-  left: 0;
-  right: 0;
-  text-align: center;
-  font-size: 15px;
-  letter-spacing: 0.42em;
-  text-transform: lowercase;
-  color: var(--ink);
-  opacity: 0;
-  transition: opacity 1.1s ease;
-}
-.caption.on { opacity: 1; }
 
 .title-screen {
   position: absolute;
