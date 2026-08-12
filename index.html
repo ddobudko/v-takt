@@ -10,18 +10,39 @@
   <canvas id="stage"></canvas>
 
   <div class="ui">
-    <div class="hud hud-score"><span class="hud-cap">счёт</span><span id="hud-score" class="hud-num">0</span></div>
-    <div class="hud hud-tempo"><span id="hud-tempo" class="hud-num">84</span><span class="hud-cap">уд/мин</span></div>
+    <div class="hud hud-score">
+      <span class="hud-cap">счёт</span><span id="hud-score" class="hud-num">0</span>
+    </div>
+    <div class="hud hud-best">
+      <span id="hud-best-cap" class="hud-cap">рекорд</span><span id="hud-best" class="hud-best-num">0</span>
+    </div>
+    <div class="hud hud-tempo">
+      <span id="hud-tempo" class="hud-num">84</span><span class="hud-cap">уд/мин</span>
+    </div>
     <div id="hud-keys" class="hud hud-keys">r — заново&nbsp;&nbsp;·&nbsp;&nbsp;esc — в начало</div>
     <div id="hint" class="hint"></div>
 
     <div id="title" class="title-screen">
       <div class="title-word">втакт</div>
       <div class="title-sub">мир дышит своим ритмом.<br>кликните по кругу в тот момент, когда кольцо коснётся его края —<br>и не давайте инструменту замолчать.</div>
-      <div class="title-go">нажмите, чтобы начать</div>
+
+      <form id="name-form" class="name-form" hidden>
+        <input id="name-input" class="name-input" type="text" maxlength="18"
+               autocomplete="off" spellcheck="false" placeholder="как вас зовут">
+        <button class="name-go" type="submit">начать</button>
+      </form>
+
+      <div id="welcome" class="welcome" hidden>
+        <div class="welcome-line">с возвращением, <span id="welcome-name"></span></div>
+        <div id="welcome-best" class="welcome-best"></div>
+        <div class="title-go">нажмите, чтобы начать</div>
+      </div>
+
+      <button id="change-name" class="link-btn" type="button" hidden>сменить имя</button>
     </div>
   </div>
 
+  <script src="store.js"></script>
   <script src="audio.js"></script>
   <script src="game.js"></script>
 </body>

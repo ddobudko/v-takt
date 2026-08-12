@@ -30,9 +30,20 @@
   var el = {
     score: document.getElementById('hud-score'),
     tempo: document.getElementById('hud-tempo'),
+    best: document.getElementById('hud-best'),
+    bestCap: document.getElementById('hud-best-cap'),
+    bestBox: document.querySelector('.hud-best'),
     hint: document.getElementById('hint'),
-    title: document.getElementById('title')
+    title: document.getElementById('title'),
+    nameForm: document.getElementById('name-form'),
+    nameInput: document.getElementById('name-input'),
+    welcome: document.getElementById('welcome'),
+    welcomeName: document.getElementById('welcome-name'),
+    welcomeBest: document.getElementById('welcome-best'),
+    changeName: document.getElementById('change-name')
   };
+
+  function num(n) { return n.toLocaleString('ru-RU'); }
 
   /* ---------------- инструменты ---------------- */
   /* play(t, i) — фигура одного цикла, t = абсолютное время начала цикла */
@@ -137,6 +148,10 @@
     score: 0,
     combo: 0,
     sync: 0.25,
+    player: null,
+    best: 0,
+    beaten: false,
+    lastSaved: 0,
     lastBar: -1,
     errorsThisBar: 0,
     pops: [],
@@ -169,6 +184,10 @@
     st.errorsThisBar = 0;
     st.pops = [];
     st.hinted = 0;
+    st.best = st.player ? VTStore.best(st.player) : 0;
+    st.beaten = false;
+    st.lastSaved = 0;
+    paintBest();
   }
 
   function multiplier() { return 1 + Math.min(3, Math.floor(st.combo / 8)); }
@@ -311,7 +330,42 @@
     hintTimer = setTimeout(function () { el.hint.classList.remove('on'); }, 6000);
   }
 
+  function paintBest() {
+    var v = num(st.best);
+    if (el.best.textContent !== v) el.best.textContent = v;
+    var cap = st.beaten ? 'новый рекорд' : 'рекорд';
+    if (el.bestCap.textContent !== cap) el.bestCap.textContent = cap;
+    el.bestBox.classList.toggle('beaten', st.beaten);
+  }
+
+  function saveNow() {
+    if (st.player && st.score > 0) VTStore.submit(st.player, st.score);
+  }
+
+  function initTitle() {
+    var name = VTStore.getPlayer();
+    st.player = name;
+    st.best = name ? VTStore.best(name) : 0;
+    st.beaten = false;
+    if (name) {
+      el.welcomeName.textContent = name;
+      el.welcomeBest.textContent = st.best > 0
+        ? 'ваш рекорд — ' + num(st.best)
+        : 'рекорда пока нет';
+      el.welcome.hidden = false;
+      el.nameForm.hidden = true;
+      el.changeName.hidden = false;
+    } else {
+      el.welcome.hidden = true;
+      el.nameForm.hidden = false;
+      el.changeName.hidden = true;
+      setTimeout(function () { el.nameInput.focus(); }, 80);
+    }
+    paintBest();
+  }
+
   function start() {
+    if (!st.player) return;
     S.init();
     S.resume();
     st.mode = 'play';
@@ -322,19 +376,61 @@
     }, 1200);
   }
 
-  el.title.addEventListener('pointerdown', function (e) { e.preventDefault(); start(); });
+  function toTitle() {
+    saveNow();
+    st.mode = 'title';
+    st.objs = [];
+    el.hint.classList.remove('on');
+    el.title.classList.remove('gone');
+    initTitle();
+  }
+
+  el.nameForm.addEventListener('submit', function (e) {
+    e.preventDefault();
+    var v = el.nameInput.value.trim().replace(/\s+/g, ' ');
+    if (!v) {
+      el.nameInput.classList.remove('nudge');
+      void el.nameInput.offsetWidth;          // перезапуск анимации
+      el.nameInput.classList.add('nudge');
+      return;
+    }
+    VTStore.setPlayer(v);
+    st.player = v;
+    st.best = VTStore.best(v);
+    start();
+  });
+
+  el.changeName.addEventListener('pointerdown', function (e) {
+    e.preventDefault();
+    e.stopPropagation();
+    VTStore.forgetPlayer();
+    el.nameInput.value = '';
+    initTitle();
+  });
+
+  el.title.addEventListener('pointerdown', function (e) {
+    if (el.welcome.hidden) return;                        // ждём, пока представятся
+    if (e.target.closest('.link-btn, .name-form')) return;
+    e.preventDefault();
+    start();
+  });
+
   cv.addEventListener('pointerdown', onPointerDown);
 
   window.addEventListener('keydown', function (e) {
     if (e.key === 'r' || e.key === 'R' || e.key === 'к' || e.key === 'К') {
-      if (st.mode === 'play') reset();
+      if (st.mode === 'play') { saveNow(); reset(); }
     } else if (e.key === 'Escape') {
-      st.mode = 'title';
-      st.objs = [];
-      el.hint.classList.remove('on');
-      el.title.classList.remove('gone');
+      if (st.mode === 'play') toTitle();
     }
   });
+
+  window.addEventListener('pagehide', saveNow);
+  document.addEventListener('visibilitychange', function () {
+    if (document.hidden) saveNow();
+  });
+
+  initTitle();
 
   /* ---------------- размер ---------------- */
 
@@ -396,7 +492,22 @@
 
     st.pops = st.pops.filter(function (q) { return t - q.t < 0.95; });
 
-    var sc = String(st.score);
+    // рекорд обновляется прямо по ходу захода, а не в конце: игра бесконечная,
+    // «конца» у неё нет, и терять результат при закрытии вкладки нельзя
+    if (st.player && st.score > st.best) {
+      if (!st.beaten) {
+        st.beaten = true;
+        el.bestBox.classList.remove('just-beaten');
+        void el.bestBox.offsetWidth;
+        el.bestBox.classList.add('just-beaten');
+        S.confirm(S.ctxNow() + 0.02, 0.12);
+      }
+      st.best = st.score;
+      if (t - st.lastSaved > 1) { VTStore.submit(st.player, st.best); st.lastSaved = t; }
+    }
+    paintBest();
+
+    var sc = num(st.score);
     if (el.score.textContent !== sc) el.score.textContent = sc;
     var tp = String(Math.round(clock.bpm));
     if (el.tempo.textContent !== tp) el.tempo.textContent = tp;
