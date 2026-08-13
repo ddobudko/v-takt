@@ -795,10 +795,10 @@
      насыщенности почти неотличимы от белого, поле усредняется и мэша не видно:
      разброс RGB был 2–4 единицы. */
   var POINTS = [
-    { fx: 0.041, fy: 0.033, px: 0.0, py: 1.7, ax: 0.44, ay: 0.40, sat: 0.34, lt:  3.5 },
-    { fx: 0.029, fy: 0.052, px: 2.3, py: 0.4, ax: 0.46, ay: 0.42, sat: 1.00, lt: -5.0 },
-    { fx: 0.058, fy: 0.024, px: 4.1, py: 3.2, ax: 0.42, ay: 0.44, sat: 0.85, lt: -1.0 },
-    { fx: 0.036, fy: 0.045, px: 5.6, py: 1.1, ax: 0.45, ay: 0.38, sat: 0.62, lt: -3.0 }
+    { fx: 0.041, fy: 0.033, px: 0.0, py: 1.7, ax: 0.44, ay: 0.40, sat: 0.34, lt:  1.8 },
+    { fx: 0.029, fy: 0.052, px: 2.3, py: 0.4, ax: 0.46, ay: 0.42, sat: 1.00, lt: -2.5 },
+    { fx: 0.058, fy: 0.024, px: 4.1, py: 3.2, ax: 0.42, ay: 0.44, sat: 0.85, lt: -0.5 },
+    { fx: 0.036, fy: 0.045, px: 5.6, py: 1.1, ax: 0.45, ay: 0.38, sat: 0.62, lt: -1.5 }
   ];
 
   //           серо-синий  зелёный  голубой  бирюзовый
@@ -835,8 +835,8 @@
   var mpx = [0, 0, 0, 0], mpy = [0, 0, 0, 0];
   var mcr = [0, 0, 0, 0], mcg = [0, 0, 0, 0], mcb = [0, 0, 0, 0];
 
-  function drawMesh(t, tension, beatDip) {
-    var sat = 42 + 26 * tension;
+  function computeField(t, tension, beatDip) {
+    var sat = 21 + 13 * tension;      // вполовину тише прежнего
     var light = 91 - 13 * tension - beatDip;
 
     for (var i = 0; i < 4; i++) {
@@ -864,7 +864,51 @@
         d[k++] = 255;
       }
     }
-    mg.putImageData(meshImg, 0, 0);
+  }
+
+  /* Поле выводится не заливкой, а растром точек по сетке поверх светлой основы.
+     Точки группируются по огрублённому цвету: 5000 точек дают около двух сотен
+     групп, значит две сотни присвоений fillStyle вместо пяти тысяч. */
+  var dotBuckets = new Map();
+
+  function drawMeshDots(t, tension, beatDip) {
+    computeField(t, tension, beatDip);
+
+    var dpr = st.dpr;
+    var cssW = cv.width / dpr, cssH = cv.height / dpr;
+    g.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+    g.fillStyle = 'hsl(' + lerp(48, 16, tension).toFixed(0) + ',' +
+      (6 + 12 * tension).toFixed(1) + '%,' + (96.6 - 2.4 * tension - beatDip).toFixed(2) + '%)';
+    g.fillRect(0, 0, cssW, cssH);
+
+    var step = Math.max(11, Math.sqrt(cssW * cssH / 5200));
+    var half = step * 0.17;
+    var size = half * 2;
+
+    dotBuckets.clear();
+    var d = meshImg.data;
+    for (var y = step * 0.5; y < cssH; y += step) {
+      var fy = (y / cssH * MESH_H) | 0;
+      if (fy > MESH_H - 1) fy = MESH_H - 1;
+      for (var x = step * 0.5; x < cssW; x += step) {
+        var fx = (x / cssW * MESH_W) | 0;
+        if (fx > MESH_W - 1) fx = MESH_W - 1;
+        var i = (fy * MESH_W + fx) * 4;
+        var key = ((d[i] >> 2) << 12) | ((d[i + 1] >> 2) << 6) | (d[i + 2] >> 2);
+        var arr = dotBuckets.get(key);
+        if (!arr) { arr = []; dotBuckets.set(key, arr); }
+        arr.push(x, y);
+      }
+    }
+
+    dotBuckets.forEach(function (arr, key) {
+      g.fillStyle = 'rgb(' + (((key >> 12) & 63) << 2) + ',' +
+        (((key >> 6) & 63) << 2) + ',' + ((key & 63) << 2) + ')';
+      for (var k = 0; k < arr.length; k += 2) {
+        g.fillRect(arr[k] - half, arr[k + 1] - half, size, size);
+      }
+    });
   }
 
   function draw(t) {
@@ -872,9 +916,7 @@
     var bp = beatAt(t);
     bp = bp - Math.floor(bp);
     var dip = st.objs.length ? Math.pow(1 - bp, 6) * 0.9 * st.sync : 0;
-    drawMesh(t, st.tension, dip);
-    g.imageSmoothingEnabled = true;
-    g.drawImage(mesh, 0, 0, cv.width, cv.height);
+    drawMeshDots(t, st.tension, dip);
     if (!st.objs.length) return;
 
     var d = st.dpr;
@@ -1020,7 +1062,8 @@
 
   window.__VT = { st: st, clock: clock, INSTR: INSTR, COMPOSITION: COMPOSITION, GRID: GRID,
                   beatAt: beatAt, timeAt: timeAt, tempo: function () { return targetBpm; },
-                  mesh: mesh, drawMesh: drawMesh };
+                  mesh: mesh, meshImg: meshImg, computeField: computeField,
+                  drawMeshDots: drawMeshDots };
 
   var last = 0;
   function frame() {

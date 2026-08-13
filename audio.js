@@ -124,10 +124,12 @@
     var f = ctx.createBiquadFilter();
     f.type = 'highpass';
     f.frequency.value = 4800;
-    // потолок сверху: без него хэт — чистое шило, вся энергия выше 2 кГц
+    // потолок сверху: без него хэт — чистое шило, вся энергия выше 2 кГц.
+    // Считаем от частоты дискретизации: на устройствах с 16 кГц (например
+    // гарнитура в режиме связи) 9000 оказывается выше Найквиста
     var lp = ctx.createBiquadFilter();
     lp.type = 'lowpass';
-    lp.frequency.value = 9000;
+    lp.frequency.value = Math.min(9000, ctx.sampleRate * 0.45);
     lp.Q.value = 0.5;
     var g = ctx.createGain();
     env(g, t, v, 0.003, 0.065);
