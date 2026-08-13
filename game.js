@@ -864,51 +864,67 @@
         d[k++] = 255;
       }
     }
+    mg.putImageData(meshImg, 0, 0);
   }
 
-  /* Поле выводится не заливкой, а растром точек по сетке поверх светлой основы.
-     Точки группируются по огрублённому цвету: 5000 точек дают около двух сотен
-     групп, значит две сотни присвоений fillStyle вместо пяти тысяч. */
-  var dotBuckets = new Map();
+  /* Поле выводится не заливкой, а сеткой точек в один пиксель. Рисовать их
+     поштучно нельзя: при таком шаге их десятки тысяч на кадр. Поэтому поле
+     рисуется целиком в слой, а потом по нему вырезается точечная маска —
+     три полноэкранных операции вместо десятков тысяч заливок. */
+  var DOT_STEP = 5;    // шаг сетки в CSS-пикселях
+  var DOT_ALPHA = 0.5; // прозрачность сетки
+
+  var layer = document.createElement('canvas');
+  var lg = layer.getContext('2d');
+  var dotTile = document.createElement('canvas');
+  var dotPattern = null, tileStep = 0, tileDot = 0;
+
+  function ensureDotPattern(step, dot) {
+    if (dotPattern && tileStep === step && tileDot === dot) return;
+    dotTile.width = step;
+    dotTile.height = step;
+    var tg = dotTile.getContext('2d');
+    tg.clearRect(0, 0, step, step);
+    tg.fillStyle = '#000';
+    tg.fillRect(0, 0, dot, dot);
+    dotPattern = lg.createPattern(dotTile, 'repeat');
+    tileStep = step;
+    tileDot = dot;
+  }
 
   function drawMeshDots(t, tension, beatDip) {
     computeField(t, tension, beatDip);
 
     var dpr = st.dpr;
-    var cssW = cv.width / dpr, cssH = cv.height / dpr;
-    g.setTransform(dpr, 0, 0, dpr, 0, 0);
+    var W = cv.width, H = cv.height;
+    var dot = Math.max(1, Math.round(dpr));            // один CSS-пиксель
+    var step = Math.max(dot + 1, Math.round(DOT_STEP * dpr));
 
+    if (layer.width !== W || layer.height !== H) {
+      layer.width = W;
+      layer.height = H;
+      dotPattern = null;                               // контекст слоя пересоздан
+    }
+    ensureDotPattern(step, dot);
+
+    // поле целиком в слой, затем оставляем от него только точки сетки
+    lg.setTransform(1, 0, 0, 1, 0, 0);
+    lg.globalCompositeOperation = 'source-over';
+    lg.clearRect(0, 0, W, H);
+    lg.imageSmoothingEnabled = true;
+    lg.drawImage(mesh, 0, 0, W, H);
+    lg.globalCompositeOperation = 'destination-in';
+    lg.fillStyle = dotPattern;
+    lg.fillRect(0, 0, W, H);
+    lg.globalCompositeOperation = 'source-over';
+
+    g.setTransform(1, 0, 0, 1, 0, 0);
     g.fillStyle = 'hsl(' + lerp(48, 16, tension).toFixed(0) + ',' +
       (6 + 12 * tension).toFixed(1) + '%,' + (96.6 - 2.4 * tension - beatDip).toFixed(2) + '%)';
-    g.fillRect(0, 0, cssW, cssH);
-
-    var step = Math.max(11, Math.sqrt(cssW * cssH / 5200));
-    var half = step * 0.17;
-    var size = half * 2;
-
-    dotBuckets.clear();
-    var d = meshImg.data;
-    for (var y = step * 0.5; y < cssH; y += step) {
-      var fy = (y / cssH * MESH_H) | 0;
-      if (fy > MESH_H - 1) fy = MESH_H - 1;
-      for (var x = step * 0.5; x < cssW; x += step) {
-        var fx = (x / cssW * MESH_W) | 0;
-        if (fx > MESH_W - 1) fx = MESH_W - 1;
-        var i = (fy * MESH_W + fx) * 4;
-        var key = ((d[i] >> 2) << 12) | ((d[i + 1] >> 2) << 6) | (d[i + 2] >> 2);
-        var arr = dotBuckets.get(key);
-        if (!arr) { arr = []; dotBuckets.set(key, arr); }
-        arr.push(x, y);
-      }
-    }
-
-    dotBuckets.forEach(function (arr, key) {
-      g.fillStyle = 'rgb(' + (((key >> 12) & 63) << 2) + ',' +
-        (((key >> 6) & 63) << 2) + ',' + ((key & 63) << 2) + ')';
-      for (var k = 0; k < arr.length; k += 2) {
-        g.fillRect(arr[k] - half, arr[k + 1] - half, size, size);
-      }
-    });
+    g.fillRect(0, 0, W, H);
+    g.globalAlpha = DOT_ALPHA;
+    g.drawImage(layer, 0, 0);
+    g.globalAlpha = 1;
   }
 
   function draw(t) {
