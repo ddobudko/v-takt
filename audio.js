@@ -200,6 +200,45 @@
     o.stop(t + 0.78);
   }
 
+  // том: закрывает дыру в низкой середине между киком и басом
+  function tom(t, m, v) {
+    var f0 = midi(m);
+    var o = ctx.createOscillator();
+    o.type = 'sine';
+    o.frequency.setValueAtTime(f0 * 1.9, t);
+    o.frequency.exponentialRampToValueAtTime(f0, t + 0.2);
+    var g = ctx.createGain();
+    env(g, t, v, 0.012, 0.55);
+    var b = bus(0.5, 0.22);
+    o.connect(g); g.connect(b);
+    o.start(t); o.stop(t + 0.6);
+
+    // короткий призвук пластика, чтобы том не был чистой синусоидой
+    var s = noise();
+    var f = ctx.createBiquadFilter();
+    f.type = 'bandpass'; f.frequency.value = 900; f.Q.value = 1.4;
+    var ng = ctx.createGain();
+    env(ng, t, v * 0.16, 0.002, 0.06);
+    s.connect(f); f.connect(ng); ng.connect(b);
+    s.start(t); s.stop(t + 0.1);
+  }
+
+  // стекло: редкие высокие капли поверх всего, тихо и с длинным хвостом
+  function glass(t, m, v) {
+    var g = ctx.createGain();
+    env(g, t, v, 0.014, 1.7);
+    g.connect(bus(0.3, 0.9));
+    [[1, 1], [2, 0.16], [3.99, 0.05]].forEach(function (p) {
+      var o = ctx.createOscillator();
+      o.type = 'sine';
+      o.frequency.value = midi(m) * p[0];
+      var gg = ctx.createGain();
+      gg.gain.value = p[1];
+      o.connect(gg); gg.connect(g);
+      o.start(t); o.stop(t + 1.8);
+    });
+  }
+
   function bell(t, m, v) {
     var g = ctx.createGain();
     env(g, t, v, 0.01, 2.3);
@@ -302,7 +341,7 @@
     now: function () { return ctx ? ctx.currentTime - lat : 0; },
     latency: function () { return lat; },
     kick: kick, hat: hat, rim: rim, bass: bass,
-    pluck: pluck, bell: bell, pad: pad,
+    pluck: pluck, bell: bell, pad: pad, tom: tom, glass: glass,
     confirm: confirm_, thud: thud, chord: chord, expire: expire,
     // точка съёма для замеров уровня и спектра при настройке
     graph: function () { return { ctx: ctx, master: master, out: outNode }; }

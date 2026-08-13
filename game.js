@@ -126,6 +126,29 @@
       ch: [[57, 60, 64], [55, 60, 64]],
       play: function (t, i, bd) { S.pad(t, this.ch[i % 2], 0.13, 8 * bd); },
       accent: function (t, bd) { S.pad(t, [57, 60, 64], 0.1, 2 * bd); }
+    },
+    tom: {
+      hue: 320, sat: 26, light: 48,
+      play: function (t, i, bd) {
+        S.tom(t, 45, 0.4);
+        S.tom(t + 3.5 * bd, i % 2 ? 40 : 43, 0.28);
+      },
+      accent: function (t) { S.tom(t, 45, 0.36); }
+    },
+    glass: {
+      hue: 100, sat: 22, light: 46,
+      ph: [
+        [[0, 84], [2.5, 91], [4, 88]],
+        [[0, 88], [3, 93], [5.5, 84]],
+        [[0.5, 91], [2, 84], [4.5, 93]],
+        [[0, 93], [2.5, 88], [6, 91]]
+      ],
+      play: function (t, i, bd) {
+        this.ph[i % this.ph.length].forEach(function (n) {
+          S.glass(t + n[0] * bd, n[1], 0.2);
+        });
+      },
+      accent: function (t) { S.glass(t, 88, 0.2); }
     }
   };
 
@@ -152,7 +175,9 @@
     { kind: 'rim',   period: 3 },
     { kind: 'pluck', period: 4 },
     { kind: 'bell',  period: 5 },
-    { kind: 'pad',   period: 8 }
+    { kind: 'pad',   period: 8 },
+    { kind: 'tom',   period: 6 },
+    { kind: 'glass', period: 7 }   // 7 — простое число: фраза долго не повторяется
   ];
 
   /* ---------------- часы с картой темпа ----------------
