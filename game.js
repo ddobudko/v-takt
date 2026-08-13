@@ -183,6 +183,17 @@
     [-1, 1]
   ];
 
+  /* Клавиша привязана к слоту сетки, а не к инструменту: буква всегда
+     совпадает с местом плитки на экране. Ключом берём e.code — физическую
+     клавишу, чтобы работало и на русской раскладке. */
+  var KEYS = {
+    '-1,-1': 'KeyQ', '0,-1': 'KeyW', '1,-1': 'KeyE',
+    '-1,0':  'KeyA', '0,0':  'KeyS', '1,0':  'KeyD',
+    '-1,1':  'KeyZ', '0,1':  'KeyX', '1,1':  'KeyC'
+  };
+  var KEY_TO_SLOT = {};
+  Object.keys(KEYS).forEach(function (slot) { KEY_TO_SLOT[KEYS[slot]] = slot; });
+
   /* Порядок входа — он же музыкальная драматургия и шкала ценности: каждый
      следующий стоит дороже предыдущего.
      offset — сдвиг сетки плитки в долях. Без него плитки с одинаковым
@@ -248,8 +259,10 @@
   function reset() {
     st.objs = COMPOSITION.map(function (c, i) {
       var slot = GRID[i];
+      var code = KEYS[slot[0] + ',' + slot[1]];
       return {
         id: i, order: i, kind: c.kind, period: c.period, offset: c.offset || 0,
+        key: code, keyLabel: code.slice(3),
         x: FIELD / 2 + slot[0] * STEP, y: FIELD / 2 + slot[1] * STEP,
         size: TILE, half: HALF, radius: TILE * 0.22,
         factor: i + 1,                       // во столько раз дороже первого
@@ -386,10 +399,13 @@
 
   function onPointerDown(ev) {
     if (st.mode !== 'play' || st.paused) return;
-    var t = heardTimeOf(ev);
     var target = objectAt(ev.clientX, ev.clientY);
-    if (!target) return;                     // мимо всего — без наказания
+    if (target) hit(target, heardTimeOf(ev));   // мимо всего — без наказания
+  }
 
+  /* Общий путь для мыши и клавиатуры: разойдись они, окна попадания
+     пришлось бы держать в двух местах. */
+  function hit(target, t) {
     var beat = beatAt(t);
     var k = Math.max(0, Math.round(cyclePos(target, beat)));
     var err = Math.abs(t - timeAt(k * target.period + target.offset));
@@ -615,6 +631,15 @@
       return;
     }
     if (st.mode !== 'play') return;
+
+    if (!st.paused && !e.repeat && KEY_TO_SLOT[e.code]) {
+      var o = null;
+      for (var i = 0; i < st.objs.length; i++) {
+        if (st.objs[i].visible && st.objs[i].key === e.code) { o = st.objs[i]; break; }
+      }
+      if (o) { e.preventDefault(); hit(o, heardTimeOf(e)); return; }
+    }
+
     if (again) {
       saveNow();
       setPaused(false);
@@ -1057,12 +1082,22 @@
           ? syncedColor(inst, 0.68 * a, -4, satScale)
           : 'hsla(28,7%,42%,' + (0.5 * a) + ')';
 
-      g.textAlign = 'center';
       g.save();
+      g.textAlign = 'center';
       if ('letterSpacing' in g) g.letterSpacing = '0.12em';
       g.font = '11px -apple-system, BlinkMacSystemFont, Helvetica Neue, sans-serif';
       g.fillStyle = ink;
       g.fillText(inst.title, x, y - o.half + 25);
+      g.restore();
+
+      // клавиша — в углу, чтобы не спорила с подписью по центру
+      g.save();
+      g.textAlign = 'right';
+      g.font = '10px -apple-system, BlinkMacSystemFont, Helvetica Neue, sans-serif';
+      g.fillStyle = o.alive
+        ? syncedColor(inst, 0.42 * a, 0, satScale)
+        : 'hsla(28,7%,45%,' + (0.38 * a) + ')';
+      g.fillText(o.keyLabel, x + o.half - 11, y - o.half + 25);
       g.restore();
 
       g.beginPath();
