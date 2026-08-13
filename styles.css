@@ -198,7 +198,10 @@ body {
   letter-spacing: 0.06em;
   color: #16150f;
   text-align: center;
-  max-width: 460px;
+  /* строки разбиты вручную через <br>: контейнер должен вмещать самую длинную,
+     иначе последнее слово срывается на отдельную строку */
+  max-width: min(760px, 90vw);
+  text-wrap: balance;
 }
 
 .title-go {
