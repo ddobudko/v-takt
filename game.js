@@ -183,18 +183,22 @@
     [-1, 1]
   ];
 
-  /* порядок входа — он же музыкальная драматургия и шкала ценности:
-     каждый следующий стоит дороже предыдущего */
+  /* Порядок входа — он же музыкальная драматургия и шкала ценности: каждый
+     следующий стоит дороже предыдущего.
+     offset — сдвиг сетки плитки в долях. Без него плитки с одинаковым
+     периодом привязаны к одному нулю и их доли совпадают всегда: контуры
+     сходятся к краю одновременно, и две плитки читаются как одна.
+     Низ (пульс, бас, пад) держим на сильной доле, остальное разводим. */
   var COMPOSITION = [
-    { kind: 'kick',  period: 2 },
-    { kind: 'bass',  period: 4 },
-    { kind: 'hat',   period: 2 },
-    { kind: 'rim',   period: 3 },
-    { kind: 'pluck', period: 4 },
-    { kind: 'bell',  period: 5 },
-    { kind: 'pad',   period: 8 },
-    { kind: 'tom',   period: 6 },
-    { kind: 'glass', period: 7 }   // 7 — простое число: фраза долго не повторяется
+    { kind: 'kick',  period: 2, offset: 0 },
+    { kind: 'bass',  period: 4, offset: 0 },
+    { kind: 'hat',   period: 2, offset: 1 },
+    { kind: 'rim',   period: 3, offset: 0 },
+    { kind: 'pluck', period: 4, offset: 2 },
+    { kind: 'bell',  period: 5, offset: 1 },
+    { kind: 'pad',   period: 8, offset: 0 },
+    { kind: 'tom',   period: 6, offset: 3 },
+    { kind: 'glass', period: 7, offset: 2 }   // 7 — простое: фраза долго не повторяется
   ];
 
   /* ---------------- часы с картой темпа ----------------
@@ -245,7 +249,7 @@
     st.objs = COMPOSITION.map(function (c, i) {
       var slot = GRID[i];
       return {
-        id: i, order: i, kind: c.kind, period: c.period,
+        id: i, order: i, kind: c.kind, period: c.period, offset: c.offset || 0,
         x: FIELD / 2 + slot[0] * STEP, y: FIELD / 2 + slot[1] * STEP,
         size: TILE, half: HALF, radius: TILE * 0.22,
         factor: i + 1,                       // во столько раз дороже первого
@@ -285,10 +289,12 @@
   }
 
   /* заряд инструмента: 1 — только что подтверждён, 0 — последняя доля-шанс */
+  /* положение в собственных кругах плитки — с её сдвигом сетки */
+  function cyclePos(o, beat) { return (beat - o.offset) / o.period; }
+
   function chargeFrac(o, beat) {
     if (!o.alive) return 0;
-    var remaining = o.until + 1 - beat / o.period;
-    return Math.max(0, Math.min(1, remaining / LIFE));
+    return Math.max(0, Math.min(1, (o.until + 1 - cyclePos(o, beat)) / LIFE));
   }
 
   function bleeding(o, beat) {
@@ -320,8 +326,10 @@
       var bd = beatDur();
       if (bt > S.ctxNow() + 0.005) {
         st.objs.forEach(function (o) {
-          if (!o.alive || st.cursor % o.period !== 0) return;
-          var k = st.cursor / o.period;
+          if (!o.alive) return;
+          var rel = st.cursor - o.offset;
+          if (rel < 0 || rel % o.period !== 0) return;
+          var k = rel / o.period;
           if (k > o.until + 1) return;          // последняя доля-шанс ещё звучит
           INSTR[o.kind].play(bt, k, bd);
         });
@@ -383,8 +391,8 @@
     if (!target) return;                     // мимо всего — без наказания
 
     var beat = beatAt(t);
-    var k = Math.max(0, Math.round(beat / target.period));
-    var err = Math.abs(t - timeAt(k * target.period));
+    var k = Math.max(0, Math.round(cyclePos(target, beat)));
+    var err = Math.abs(t - timeAt(k * target.period + target.offset));
     var aNow = S.ctxNow() + 0.02;
 
     if (err <= GOOD) {
@@ -657,9 +665,9 @@
       if (!o.visible) return;
 
       // угасание: даём доиграть окно попадания последней доли-шанса
-      if (o.alive && t > timeAt((o.until + 1) * o.period) + GOOD) expire(o);
+      if (o.alive && t > timeAt((o.until + 1) * o.period + o.offset) + GOOD) expire(o);
 
-      var p = beat / o.period;
+      var p = cyclePos(o, beat);
       p = p - Math.floor(p);
       if (p < o.lastPhase) {
         if (o.alive) { o.ripples.push({ t: t, s: 0.9 }); o.flash = Math.max(o.flash, 0.85); }
@@ -948,7 +956,7 @@
       if (!o.visible) return;
       var inst = INSTR[o.kind];
       var a = Math.min(1, (t - o.appearAt) / FADE);
-      var p = beat / o.period; p = p - Math.floor(p);
+      var p = cyclePos(o, beat); p = p - Math.floor(p);
       var jitter = o.shake > 0 ? Math.sin(t * 90) * o.shake * 5 : 0;
       var x = o.x + jitter, y = o.y;
 
