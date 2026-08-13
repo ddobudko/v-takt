@@ -8,7 +8,18 @@
 
   var S = window.SND;
 
-  var VW = 1000, VH = 620;            // виртуальное поле композиции
+  /* Геометрия сетки. Индикатор заряда идёт по периметру в GAP от края плитки.
+     Шаг подобран так, чтобы зазор между индикаторами соседей был тот же GAP:
+     STEP = 2·(полуразмер + GAP) + GAP. Точное равенство возможно только при
+     одинаковых плитках, поэтому размер у всех один. */
+  var TILE = 120;
+  var GAP = 9;
+  var HALF = TILE / 2;
+  var RING = HALF + GAP;              // индикатор: полурасстояние от центра
+  var STEP = 2 * RING + GAP;          // центр к центру
+  var FIELD = 2 * STEP + 2 * RING + 44;
+  var VW = FIELD, VH = FIELD;         // поле квадратное — сетка квадратная
+
   var PERFECT = 0.085, GOOD = 0.155;  // окна попадания, секунды
 
   var BEATS_PER_BAR = 4;
@@ -118,18 +129,18 @@
     }
   };
 
-  /* сетка 3×3: от центра наружу, углы по диагонали — так семь плиток
+  /* сетка 3×3 в шагах от центра, наружу; углы по диагонали — так семь плиток
      остаются уравновешенными */
   var GRID = [
-    [1 / 2, 1 / 2],   // центр
-    [1 / 6, 1 / 2],   // центр слева
-    [5 / 6, 1 / 2],   // центр справа
-    [1 / 2, 1 / 6],   // сверху по центру
-    [1 / 2, 5 / 6],   // снизу по центру
-    [1 / 6, 1 / 6],   // угол сверху слева
-    [5 / 6, 5 / 6],   // угол снизу справа
-    [5 / 6, 1 / 6],
-    [1 / 6, 5 / 6]
+    [0, 0],    // центр
+    [-1, 0],   // центр слева
+    [1, 0],    // центр справа
+    [0, -1],   // сверху по центру
+    [0, 1],    // снизу по центру
+    [-1, -1],  // угол сверху слева
+    [1, 1],    // угол снизу справа
+    [1, -1],
+    [-1, 1]
   ];
 
   /* порядок входа — он же музыкальная драматургия и шкала ценности:
@@ -187,16 +198,13 @@
     scale: 1, ox: 0, oy: 0, dpr: 1
   };
 
-  function sizeFor(period) { return 104 + period * 4; }
-
   function reset() {
     st.objs = COMPOSITION.map(function (c, i) {
       var slot = GRID[i];
-      var size = sizeFor(c.period);
       return {
         id: i, order: i, kind: c.kind, period: c.period,
-        x: slot[0] * VW, y: slot[1] * VH,
-        size: size, half: size / 2, radius: size * 0.22,
+        x: FIELD / 2 + slot[0] * STEP, y: FIELD / 2 + slot[1] * STEP,
+        size: TILE, half: HALF, radius: TILE * 0.22,
         factor: i + 1,                       // во столько раз дороже первого
         introBeat: i * INTRO_BARS * BEATS_PER_BAR,
         graceUntil: 0,
@@ -713,7 +721,8 @@
       o.ripples.forEach(function (r) {
         var k = (t - r.t) / 1.25;
         if (k > 1) return;
-        var s = o.size + k * 88 * r.s;   // в сетке волна должна жить внутри своей ячейки
+        // волна доходит ровно до индикатора и там гаснет: дальше уже зона соседа
+        var s = o.size + k * 2 * GAP * r.s;
         tilePath(x, y, s, o.radius * (s / o.size));
         g.strokeStyle = syncedColor(inst, (1 - k) * 0.28 * r.s * a, 0, satScale);
         g.lineWidth = 1.4 * (1 - k);
@@ -734,27 +743,26 @@
       g.lineWidth = (1.2 + land * 2) * (warning ? 1.6 : 1);
       g.stroke();
 
-      if (warning) {
-        // тревожный ореол пульсирует на каждой своей доле
-        tilePath(x, y, o.size + 34 + o.warnFlash * 12, o.radius + 17);
-        g.strokeStyle = 'hsla(12,58%,52%,' +
-          ((0.1 + 0.45 * o.warnFlash) * (0.45 + 0.55 * urgency) * a).toFixed(3) + ')';
-        g.lineWidth = 1.4 + o.warnFlash * 2.4;
-        g.stroke();
-      }
+      /* Отдельного тревожного ореола больше нет: в плотной сетке он лез бы
+         к соседям. Тревога живёт внутри своей рамки — дуга толще и ярче,
+         контур плитки уходит в глину, на доле-шансе туда же уходит
+         приближающийся контур. */
 
       if (leak) {
         // молчащая плитка не уходит, а тянет очки — и видно, что она тянет
-        tilePath(x, y, o.size + 18 + o.bleed * 8, o.radius + 9);
-        g.strokeStyle = 'hsla(12,45%,52%,' + ((0.12 + 0.3 * o.bleed) * a).toFixed(3) + ')';
-        g.lineWidth = 1.2 + o.bleed * 1.6;
+        tilePath(x, y, o.size + 2 * GAP, o.radius + GAP);
+        g.strokeStyle = 'hsla(12,45%,52%,' + ((0.14 + 0.34 * o.bleed) * a).toFixed(3) + ')';
+        g.lineWidth = 1.2 + o.bleed * 1.8;
         g.stroke();
       }
 
       // тело плитки
       tilePath(x, y, o.size, o.radius);
       if (o.alive) {
-        g.fillStyle = syncedColor(inst, (0.09 + o.flash * 0.15) * a, 0, satScale);
+        // в тревоге плитка вспыхивает внутрь — сигнал, не выходящий за рамку
+        g.fillStyle = warning
+          ? 'hsla(12,45%,55%,' + ((0.08 + 0.16 * o.warnFlash) * a).toFixed(3) + ')'
+          : syncedColor(inst, (0.09 + o.flash * 0.15) * a, 0, satScale);
         g.fill();
         g.strokeStyle = warning
           ? 'hsla(12,50%,48%,' + ((0.45 + 0.35 * urgency + o.flash * 0.3) * a).toFixed(3) + ')'
@@ -776,7 +784,7 @@
       // пустая на доле-шансе. В тревоге держим минимальную длину, иначе она
       // исчезает ровно тогда, когда нужнее всего
       if (o.alive) {
-        var gs = o.size + 18, gr = o.radius + 9;
+        var gs = o.size + 2 * GAP, gr = o.radius + GAP;
         var per = perimeter(gs, gr);
         var shown = warning ? Math.max(frac, 0.05) : frac;
         g.save();
