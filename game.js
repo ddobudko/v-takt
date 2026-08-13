@@ -301,8 +301,10 @@
       (inst.light + (lightShift || 0)).toFixed(1) + '%,' + alpha + ')';
   }
 
+  /* Очки всплывают внутри плитки, а не над ней: после уплотнения сетки
+     надпись над плиткой залезала в соседний ряд. */
   function pop(o, text, good) {
-    st.pops.push({ x: o.x, y: o.y - o.half - 14, text: text, t: S.now(),
+    st.pops.push({ x: o.x, y: o.y + 12, text: text, t: S.now(),
                    hue: INSTR[o.kind].hue, good: good });
   }
 
@@ -944,8 +946,22 @@
         g.restore();
       }
 
-      // ядро и цена инструмента; цена — у нижнего края, где растущий контур
-      // почти прозрачен и не спорит с цифрой
+      // подпись сверху, ядро в центре, цена снизу: и то и другое у краёв,
+      // где растущий контур ещё почти прозрачен и не спорит с текстом
+      var ink = warning
+        ? 'hsla(12,48%,44%,' + (0.72 * a).toFixed(3) + ')'
+        : o.alive
+          ? syncedColor(inst, 0.68 * a, -4, satScale)
+          : 'hsla(28,7%,42%,' + (0.5 * a) + ')';
+
+      g.textAlign = 'center';
+      g.save();
+      if ('letterSpacing' in g) g.letterSpacing = '0.12em';
+      g.font = '11px -apple-system, BlinkMacSystemFont, Helvetica Neue, sans-serif';
+      g.fillStyle = ink;
+      g.fillText(inst.title, x, y - o.half + 25);
+      g.restore();
+
       g.beginPath();
       g.arc(x, y, o.alive ? 2.8 + o.flash * 2.6 : 2.2, 0, Math.PI * 2);
       g.fillStyle = o.alive
@@ -953,11 +969,8 @@
         : 'hsla(28,7%,40%,' + (0.5 * a) + ')';
       g.fill();
 
-      g.textAlign = 'center';
       g.font = '12px -apple-system, BlinkMacSystemFont, Helvetica Neue, sans-serif';
-      g.fillStyle = o.alive
-        ? syncedColor(inst, 0.6 * a, 0, satScale)
-        : 'hsla(28,7%,45%,' + (0.4 * a) + ')';
+      g.fillStyle = ink;
       g.fillText('×' + o.factor, x, y + o.half - 14);
     });
 
@@ -969,7 +982,7 @@
       g.fillStyle = q.good
         ? 'hsla(' + q.hue + ',38%,42%,' + (1 - k) + ')'
         : 'hsla(12,55%,45%,' + (1 - k) + ')';
-      g.fillText(q.text, q.x, q.y - k * 22);
+      g.fillText(q.text, q.x, q.y - k * 24);
     });
   }
 
