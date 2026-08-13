@@ -479,6 +479,7 @@
   }
 
   function initTitle() {
+    document.body.classList.add('on-title');
     var name = VTStore.getPlayer();
     st.player = name;
     st.best = name ? VTStore.best(name) : 0;
@@ -502,6 +503,7 @@
 
   function start() {
     if (!st.player) return;
+    document.body.classList.remove('on-title');
     S.init();
     S.resume();
     st.mode = 'play';
@@ -849,8 +851,8 @@
      годившийся для сплошного фона, здесь пропадает полностью: сетку видно
      только если сама точка заметно темнее бумаги. */
   function computeField(t, tension, beatDip) {
-    var sat = 57 + 36 * tension;      // ярче прежнего в полтора раза
-    var light = 76 - 12 * tension - beatDip;
+    var sat = 80 + 40 * tension;
+    var light = 69 - 11 * tension - beatDip;
 
     for (var i = 0; i < 4; i++) {
       var p = POINTS[i];

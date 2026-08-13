@@ -58,6 +58,10 @@ body {
 /* фон теперь цветной и подвижный — подписи считаются от него, а не от бумаги */
 .hud-cap { color: #7d7a72; }
 
+/* на титуле игрового HUD быть не должно: раньше его прятала пелена,
+   теперь экран прозрачный и сетка видна насквозь */
+body.on-title .hud { opacity: 0; }
+
 .hud-num {
   font-size: 20px;
   font-weight: 300;
@@ -178,7 +182,9 @@ body {
   align-items: center;
   justify-content: center;
   gap: 22px;
-  background: rgba(246, 245, 242, 0.9);
+  /* фон не рисуем: под экраном уже лежит холст с точечной сеткой,
+     любая пелена её бы съела */
+  background: transparent;
   transition: opacity 0.9s ease;
   pointer-events: auto;
   cursor: pointer;
