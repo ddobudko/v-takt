@@ -55,7 +55,8 @@ body {
   gap: 10px;
 }
 
-.hud-cap { color: #b8b5ad; }
+/* фон теперь цветной и подвижный — подписи считаются от него, а не от бумаги */
+.hud-cap { color: #7d7a72; }
 
 .hud-num {
   font-size: 20px;
@@ -68,7 +69,7 @@ body {
 .hud-best-num {
   font-size: 12px;
   letter-spacing: 0.1em;
-  color: #a3a099;
+  color: #6f6c65;
   font-variant-numeric: tabular-nums;
 }
 

@@ -780,61 +780,91 @@
      Палитра ведётся напряжением: спокойно — серо-зелёно-голубое, тревожно —
      жёлтое и оранжевое, на грани конца — красное. */
 
+  var MESH_W = 128, MESH_H = 80;
   var mesh = document.createElement('canvas');
-  mesh.width = 320;      // мельче — и на растяжке до полного экрана видны полосы
-  mesh.height = 200;
+  mesh.width = MESH_W;
+  mesh.height = MESH_H;
   var mg = mesh.getContext('2d');
+  var meshImg = mg.createImageData(MESH_W, MESH_H);
 
-  /* Пятна нарочно некрупные и разнесённые: если каждое накрывает весь холст,
-     они усредняются в одну плашку и мэша не видно. sat — доля насыщенности,
-     у первого почти ноль, это и есть «серый» в спокойной палитре. */
-  var BLOBS = [
-    { fx: 0.043, fy: 0.031, px: 0.0, py: 1.7, r: 0.52, ax: 0.52, ay: 0.46, sat: 0.30 },
-    { fx: 0.027, fy: 0.052, px: 2.3, py: 0.4, r: 0.44, ax: 0.56, ay: 0.42, sat: 1.00 },
-    { fx: 0.061, fy: 0.023, px: 4.1, py: 3.2, r: 0.48, ax: 0.48, ay: 0.52, sat: 0.78 },
-    { fx: 0.034, fy: 0.045, px: 5.6, py: 1.1, r: 0.40, ax: 0.54, ay: 0.50, sat: 0.55 },
-    { fx: 0.019, fy: 0.037, px: 1.2, py: 4.8, r: 0.58, ax: 0.44, ay: 0.40, sat: 0.92 }
+  /* Четыре точки, каждая своего цвета, гуляют по всему полю. Цвет пикселя —
+     смесь всех четырёх, взвешенная обратным квадратом расстояния. Поле
+     сплошное: бумаги под ним нет, как и в референсе.
+     sat — доля насыщенности точки; у первой она мала, это и есть «серый». */
+  /* lt — сдвиг светлоты точки. Без него все четыре при светлоте 92 % и низкой
+     насыщенности почти неотличимы от белого, поле усредняется и мэша не видно:
+     разброс RGB был 2–4 единицы. */
+  var POINTS = [
+    { fx: 0.041, fy: 0.033, px: 0.0, py: 1.7, ax: 0.44, ay: 0.40, sat: 0.34, lt:  3.5 },
+    { fx: 0.029, fy: 0.052, px: 2.3, py: 0.4, ax: 0.46, ay: 0.42, sat: 1.00, lt: -5.0 },
+    { fx: 0.058, fy: 0.024, px: 4.1, py: 3.2, ax: 0.42, ay: 0.44, sat: 0.85, lt: -1.0 },
+    { fx: 0.036, fy: 0.045, px: 5.6, py: 1.1, ax: 0.45, ay: 0.38, sat: 0.62, lt: -3.0 }
   ];
 
-  //           серо-синий  зелёный  голубой  индиго  бирюзовый
-  var CALM = [215, 142, 196, 234, 168];
-  var WARM = [52,   36,  60,  44,   30];
-  var HOT  = [10,    2,  18,   6,   14];
+  //           серо-синий  зелёный  голубой  бирюзовый
+  var CALM = [215, 142, 196, 168];
+  var WARM = [52,   36,  60,  30];
+  var HOT  = [10,    2,  18,   6];
+
+  // мягкость поля: чем больше, тем плавнее переходы между точками
+  var SOFT = (MESH_W * MESH_W + MESH_H * MESH_H) * 0.035;
 
   function lerp(a, b, k) { return a + (b - a) * k; }
 
-  function blobHue(i, tension) {
+  function pointHue(i, tension) {
     return tension < 0.5
       ? lerp(CALM[i], WARM[i], tension / 0.5)
       : lerp(WARM[i], HOT[i], (tension - 0.5) / 0.5);
   }
 
-  function drawMesh(t, tension, beatDip) {
-    var w = mesh.width, h = mesh.height;
-    var paperHue = lerp(48, 16, tension);
-    mg.globalCompositeOperation = 'source-over';
-    mg.fillStyle = 'hsl(' + paperHue.toFixed(0) + ',' +
-      (7 + 16 * tension).toFixed(1) + '%,' + (96.4 - 3.2 * tension - beatDip).toFixed(2) + '%)';
-    mg.fillRect(0, 0, w, h);
-
-    var sat = 26 + 34 * tension;
-    var light = 92 - 14 * tension;
-    var alpha = 0.5 + 0.24 * tension;
-
-    for (var i = 0; i < BLOBS.length; i++) {
-      var b = BLOBS[i];
-      var x = (0.5 + b.ax * Math.sin(t * b.fx * Math.PI * 2 + b.px)) * w;
-      var y = (0.5 + b.ay * Math.cos(t * b.fy * Math.PI * 2 + b.py)) * h;
-      var r = b.r * Math.max(w, h) * (1 + 0.14 * Math.sin(t * 0.11 + i));
-      var hue = blobHue(i, tension).toFixed(0);
-      var head = 'hsla(' + hue + ',' + (sat * b.sat).toFixed(1) + '%,' + light.toFixed(1) + '%,';
-      var grad = mg.createRadialGradient(x, y, 0, x, y, r);
-      grad.addColorStop(0, head + alpha.toFixed(3) + ')');
-      grad.addColorStop(0.55, head + (alpha * 0.42).toFixed(3) + ')');
-      grad.addColorStop(1, head + '0)');
-      mg.fillStyle = grad;
-      mg.fillRect(0, 0, w, h);
+  function hslToRgb(h, s, l) {
+    h = (h % 360 + 360) % 360 / 360; s /= 100; l /= 100;
+    if (s === 0) { var v = Math.round(l * 255); return [v, v, v]; }
+    var q = l < 0.5 ? l * (1 + s) : l + s - l * s;
+    var p = 2 * l - q;
+    function ch(x) {
+      if (x < 0) x += 1; else if (x > 1) x -= 1;
+      if (x < 1 / 6) return p + (q - p) * 6 * x;
+      if (x < 1 / 2) return q;
+      if (x < 2 / 3) return p + (q - p) * (2 / 3 - x) * 6;
+      return p;
     }
+    return [Math.round(ch(h + 1 / 3) * 255), Math.round(ch(h) * 255), Math.round(ch(h - 1 / 3) * 255)];
+  }
+
+  var mpx = [0, 0, 0, 0], mpy = [0, 0, 0, 0];
+  var mcr = [0, 0, 0, 0], mcg = [0, 0, 0, 0], mcb = [0, 0, 0, 0];
+
+  function drawMesh(t, tension, beatDip) {
+    var sat = 42 + 26 * tension;
+    var light = 91 - 13 * tension - beatDip;
+
+    for (var i = 0; i < 4; i++) {
+      var p = POINTS[i];
+      mpx[i] = (0.5 + p.ax * Math.sin(t * p.fx * Math.PI * 2 + p.px)) * MESH_W;
+      mpy[i] = (0.5 + p.ay * Math.cos(t * p.fy * Math.PI * 2 + p.py)) * MESH_H;
+      var c = hslToRgb(pointHue(i, tension), sat * p.sat, light + p.lt);
+      mcr[i] = c[0]; mcg[i] = c[1]; mcb[i] = c[2];
+    }
+
+    var d = meshImg.data, k = 0;
+    for (var y = 0; y < MESH_H; y++) {
+      for (var x = 0; x < MESH_W; x++) {
+        var wsum = 0, r = 0, g2 = 0, b = 0;
+        for (var j = 0; j < 4; j++) {
+          var dx = x - mpx[j], dy = y - mpy[j];
+          var u = 1 / (dx * dx + dy * dy + SOFT);
+          u *= u;                       // обратный квадрат: точки читаются, поле остаётся гладким
+          wsum += u;
+          r += u * mcr[j]; g2 += u * mcg[j]; b += u * mcb[j];
+        }
+        d[k++] = r / wsum;
+        d[k++] = g2 / wsum;
+        d[k++] = b / wsum;
+        d[k++] = 255;
+      }
+    }
+    mg.putImageData(meshImg, 0, 0);
   }
 
   function draw(t) {
