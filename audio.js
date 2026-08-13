@@ -285,6 +285,41 @@
 
   /* ---- служебные ---- */
 
+  /* Короткий звон маленькой тарелки на попадание. Металл не даёт
+     гармонического ряда, поэтому синусоидой его не собрать: берём банк
+     прямоугольников на неравнократных отношениях (приём драм-машин) и
+     срезаем всё, кроме верха. Частоты фильтров считаем от частоты
+     дискретизации — на устройствах с 16 кГц константы уходят за Найквист. */
+  function tick(t, v) {
+    var lim = ctx.sampleRate * 0.45;
+    var mix = ctx.createGain();
+    mix.gain.value = 0.45;
+
+    [2, 3, 4.16, 5.43, 6.79, 8.21].forEach(function (r) {
+      var o = ctx.createOscillator();
+      o.type = 'square';
+      o.frequency.value = Math.min(40 * r, lim);
+      o.connect(mix);
+      o.start(t);
+      o.stop(t + 0.2);
+    });
+
+    var bp = ctx.createBiquadFilter();
+    bp.type = 'bandpass';
+    bp.frequency.value = Math.min(9000, lim);
+    bp.Q.value = 0.7;
+
+    var hp = ctx.createBiquadFilter();
+    hp.type = 'highpass';
+    hp.frequency.value = Math.min(6500, lim * 0.92);
+
+    var g = ctx.createGain();
+    env(g, t, v, 0.002, 0.075);        // очень коротко — «ц», а не «цшш»
+
+    mix.connect(bp); bp.connect(hp); hp.connect(g);
+    g.connect(bus(0.5, 0.35));
+  }
+
   function confirm_(t, v) {
     var o = ctx.createOscillator();
     o.type = 'sine';
@@ -344,7 +379,7 @@
     latency: function () { return lat; },
     kick: kick, hat: hat, rim: rim, bass: bass,
     pluck: pluck, bell: bell, pad: pad, tom: tom, glass: glass,
-    confirm: confirm_, thud: thud, chord: chord, expire: expire,
+    confirm: confirm_, tick: tick, thud: thud, chord: chord, expire: expire,
     // точка съёма для замеров уровня и спектра при настройке
     graph: function () { return { ctx: ctx, master: master, out: outNode }; }
   };

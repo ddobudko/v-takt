@@ -403,7 +403,7 @@
         target.alive = true;
         gain = SCORE_ON;
         INSTR[target.kind].accent(aNow, beatDur());
-        S.confirm(aNow, perfect ? 0.11 : 0.07);
+        S.tick(aNow, perfect ? 0.5 : 0.34);
         target.ripples.push({ t: S.now(), s: 1.15 });
         // новый голос в составе — сбрасываем темп, чтобы было где освоиться
         targetBpm = Math.max(BPM_MIN,
@@ -413,7 +413,7 @@
       } else {
         gain = perfect ? SCORE_HIT : SCORE_GOOD;
         if (was > TOPPED_UP) gain = Math.round(gain * 0.4);  // не давать долбить одну плитку
-        S.confirm(aNow, 0.05);
+        S.tick(aNow, perfect ? 0.4 : 0.26);
         target.ripples.push({ t: S.now(), s: 0.7 });
         targetBpm = Math.min(BPM_MAX, targetBpm + BPM_UP);
       }
