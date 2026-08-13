@@ -1,7 +1,8 @@
 /* «втакт» — механика фазы.
-   Один бесконечный круг. Инструменты входят по одному и не выключаются сами:
-   каждый держится LIFE своих циклов, потом угасает, если не подтвердить его
-   новым попаданием в долю. Чистая игра разгоняет темп, ошибки его сбрасывают. */
+   Один бесконечный круг. Инструменты входят по одному в сетку 3×3, от центра
+   наружу, и с экрана больше не уходят: взял — держи. Молчащий инструмент
+   постоянно тянет очки вниз, зато каждый следующий стоит дороже предыдущего.
+   Отсюда вся игра: удерживать всё взятое и тянуться за новым. */
 (function () {
   'use strict';
 
@@ -14,16 +15,21 @@
   var LIFE = 6;          // сколько своих циклов инструмент живёт без подтверждения
   var WARN = 2;          // за сколько последних циклов начинает предупреждать
   var INTRO_BARS = 4;    // через сколько тактов входит следующий инструмент
-  var DORMANT_BARS = 3;  // сколько тактов выключенный ждёт на экране, потом уходит
-  var FADE = 0.8;        // появление и уход, секунды
+  var GRACE_BARS = 2;    // сколько тактов после входа даётся, прежде чем начнёт минусить
+  var FADE = 0.8;        // появление, секунды
 
   var BPM_START = 84, BPM_MIN = 66, BPM_MAX = 150;
-  var BPM_UP = 0.3;      // за попадание
+  var BPM_UP = 0.4;      // за попадание
   var BPM_BONUS = 0.8;   // за такт, в котором все инструменты держатся уверенно
   var BPM_DOWN = 4;      // за промах или угасание
+  var BPM_TAKE_NEW = 6;  // взял инструмент впервые — даём осмотреться
+  var BPM_TAKE_BACK = 3; // вернул замолчавший — послабление поменьше
+  /* послабление за взятие должно отыгрываться обратно за интервал до следующего
+     входа, иначе темп садится в пол и больше не встаёт */
 
   var SCORE_ON = 200, SCORE_HIT = 100, SCORE_GOOD = 60;
   var SCORE_MISS = -50, SCORE_LOST = -150;
+  var DRAIN = 12;        // очков за долю с каждого молчащего инструмента
   var TOPPED_UP = 0.75;  // подтверждение почти полного заряда стоит дешевле
 
   var cv = document.getElementById('stage');
@@ -51,7 +57,7 @@
   function num(n) { return n.toLocaleString('ru-RU'); }
 
   /* ---------------- инструменты ---------------- */
-  /* play(t, i) — фигура одного цикла, t = абсолютное время начала цикла */
+  /* play(t, i, bd) — фигура одного цикла, t = абсолютное время начала цикла */
 
   var INSTR = {
     kick: {
@@ -112,16 +118,30 @@
     }
   };
 
-  /* порядок входа — он же музыкальная драматургия: пульс, бас, дыхание сверху,
-     полиритм, мелодия, колокол, пад */
+  /* сетка 3×3: от центра наружу, углы по диагонали — так семь плиток
+     остаются уравновешенными */
+  var GRID = [
+    [1 / 2, 1 / 2],   // центр
+    [1 / 6, 1 / 2],   // центр слева
+    [5 / 6, 1 / 2],   // центр справа
+    [1 / 2, 1 / 6],   // сверху по центру
+    [1 / 2, 5 / 6],   // снизу по центру
+    [1 / 6, 1 / 6],   // угол сверху слева
+    [5 / 6, 5 / 6],   // угол снизу справа
+    [5 / 6, 1 / 6],
+    [1 / 6, 5 / 6]
+  ];
+
+  /* порядок входа — он же музыкальная драматургия и шкала ценности:
+     каждый следующий стоит дороже предыдущего */
   var COMPOSITION = [
-    { kind: 'kick',  period: 2, x: 170, y: 300 },
-    { kind: 'bass',  period: 4, x: 510, y: 340 },
-    { kind: 'hat',   period: 2, x: 310, y: 150 },
-    { kind: 'rim',   period: 3, x: 300, y: 480 },
-    { kind: 'pluck', period: 4, x: 670, y: 180 },
-    { kind: 'bell',  period: 5, x: 750, y: 460 },
-    { kind: 'pad',   period: 8, x: 890, y: 290 }
+    { kind: 'kick',  period: 2 },
+    { kind: 'bass',  period: 4 },
+    { kind: 'hat',   period: 2 },
+    { kind: 'rim',   period: 3 },
+    { kind: 'pluck', period: 4 },
+    { kind: 'bell',  period: 5 },
+    { kind: 'pad',   period: 8 }
   ];
 
   /* ---------------- часы с картой темпа ----------------
@@ -148,17 +168,18 @@
 
   var st = {
     mode: 'title',
+    paused: false,
     objs: [],
     cursor: 0,          // следующая доля к планированию
     score: 0,
     combo: 0,
     sync: 0.25,
-    paused: false,
     player: null,
     best: 0,
     beaten: false,
     lastSaved: 0,
     lastBar: -1,
+    lastBeatInt: null,
     errorsThisBar: 0,
     pops: [],
     hinted: 0,
@@ -166,17 +187,23 @@
     scale: 1, ox: 0, oy: 0, dpr: 1
   };
 
-  function radiusFor(period) { return 34 + period * 9; }
+  function sizeFor(period) { return 104 + period * 4; }
 
   function reset() {
     st.objs = COMPOSITION.map(function (c, i) {
+      var slot = GRID[i];
+      var size = sizeFor(c.period);
       return {
-        id: i, kind: c.kind, period: c.period, x: c.x, y: c.y,
-        r: radiusFor(c.period),
+        id: i, order: i, kind: c.kind, period: c.period,
+        x: slot[0] * VW, y: slot[1] * VH,
+        size: size, half: size / 2, radius: size * 0.22,
+        factor: i + 1,                       // во столько раз дороже первого
         introBeat: i * INTRO_BARS * BEATS_PER_BAR,
-        visible: false, appearAt: 0, leavingAt: 0, dormantSince: null,
-        alive: false, until: -1,
-        lastPhase: 0, flash: 0, shake: 0, warnFlash: 0, ripples: []
+        graceUntil: 0,
+        visible: false, appearAt: 0,
+        alive: false, everTaken: false, until: -1,
+        drainBar: 0,
+        lastPhase: 0, flash: 0, shake: 0, warnFlash: 0, bleed: 0, ripples: []
       };
     });
     clock.timeRef = S.ctxNow() + 0.9;
@@ -186,7 +213,9 @@
     st.cursor = 0;
     st.score = 0;
     st.combo = 0;
+    st.sync = 0.4;
     st.lastBar = -1;
+    st.lastBeatInt = null;
     st.errorsThisBar = 0;
     st.pops = [];
     st.hinted = 0;
@@ -198,6 +227,10 @@
 
   function multiplier() { return 1 + Math.min(3, Math.floor(st.combo / 8)); }
 
+  function bumpSync(delta) {
+    st.sync = Math.max(0.15, Math.min(1, st.sync + delta));
+  }
+
   /* заряд инструмента: 1 — только что подтверждён, 0 — последняя доля-шанс */
   function chargeFrac(o, beat) {
     if (!o.alive) return 0;
@@ -205,10 +238,8 @@
     return Math.max(0, Math.min(1, remaining / LIFE));
   }
 
-  /* «синхрон» — качество игры, а не заряд слоёв: он красит сцену целиком.
-     Заряд отдельного инструмента показывает только его собственная дуга. */
-  function bumpSync(delta) {
-    st.sync = Math.max(0.15, Math.min(1, st.sync + delta));
+  function bleeding(o, beat) {
+    return o.visible && !o.alive && beat > o.graceUntil;
   }
 
   function syncedColor(inst, alpha, lightShift, satScale) {
@@ -218,12 +249,11 @@
   }
 
   function pop(o, text, good) {
-    st.pops.push({ x: o.x, y: o.y - o.r - 14, text: text, t: S.now(), hue: INSTR[o.kind].hue, good: good });
+    st.pops.push({ x: o.x, y: o.y - o.half - 14, text: text, t: S.now(),
+                   hue: INSTR[o.kind].hue, good: good });
   }
 
-  /* ---------------- планировщик ----------------
-     Идём курсором по целым долям: на границе такта переставляем темп,
-     на своей доле каждый живой инструмент играет фигуру цикла. */
+  /* ---------------- планировщик ---------------- */
 
   function schedule() {
     if (!S.ready() || st.mode !== 'play' || st.paused) return;
@@ -263,16 +293,19 @@
     var vy = (clientY - st.oy) / st.scale;
     var target = null, best = 1e9;
     st.objs.forEach(function (o) {
-      if (!o.visible || o.leavingAt) return;      // уходящий уже не ловится
-      var d = Math.hypot(vx - o.x, vy - o.y);
-      if (d < o.r * 1.3 && d < best) { best = d; target = o; }
+      if (!o.visible) return;
+      var dx = Math.abs(vx - o.x), dy = Math.abs(vy - o.y);
+      var reach = o.half * 1.22;
+      if (dx > reach || dy > reach) return;
+      var d = Math.max(dx, dy);
+      if (d < best) { best = d; target = o; }
     });
     return target;
   }
 
   /* Курсор пересчитывается каждый кадр, а не только на движение мыши:
-     инструменты появляются и гаснут сами, и при неподвижной мыши курсор
-     иначе остаётся от прошлого состояния. */
+     инструменты появляются сами, и при неподвижной мыши курсор иначе
+     остаётся от прошлого состояния. */
   var pointer = { x: -1, y: -1, over: false };
   var cursorNow = '';
 
@@ -305,26 +338,32 @@
       var gain;
       if (!target.alive) {
         target.alive = true;
-        target.dormantSince = null;
         gain = SCORE_ON;
         INSTR[target.kind].accent(aNow, beatDur());
         S.confirm(aNow, perfect ? 0.11 : 0.07);
         target.ripples.push({ t: S.now(), s: 1.15 });
+        // новый голос в составе — сбрасываем темп, чтобы было где освоиться
+        targetBpm = Math.max(BPM_MIN,
+          targetBpm - (target.everTaken ? BPM_TAKE_BACK : BPM_TAKE_NEW));
+        target.everTaken = true;
       } else {
         gain = perfect ? SCORE_HIT : SCORE_GOOD;
-        if (was > TOPPED_UP) gain = Math.round(gain * 0.4);  // не давать долбить один круг
+        if (was > TOPPED_UP) gain = Math.round(gain * 0.4);  // не давать долбить одну плитку
         S.confirm(aNow, 0.05);
         target.ripples.push({ t: S.now(), s: 0.7 });
+        targetBpm = Math.min(BPM_MAX, targetBpm + BPM_UP);
       }
       target.until = k + LIFE - 1;
       target.flash = 1;
       st.combo++;
-      gain *= multiplier();
+      gain = gain * target.factor * multiplier();
       st.score += gain;
-      pop(target, '+' + gain, true);
+      pop(target, '+' + num(gain), true);
       bumpSync(perfect ? 0.14 : 0.09);
-      targetBpm = Math.min(BPM_MAX, targetBpm + BPM_UP);
-      if (st.hinted === 0) { st.hinted = 1; showHint('держите инструмент живым — подтверждайте попадание, пока дуга не опустела'); }
+      if (st.hinted === 0) {
+        st.hinted = 1;
+        showHint('держите инструмент живым — подтверждайте попадание, пока дуга не опустела');
+      }
     } else {
       st.combo = 0;
       st.errorsThisBar++;
@@ -341,7 +380,7 @@
     o.alive = false;
     o.until = -1;
     o.shake = 1;
-    o.dormantSince = beatAt(S.now());     // отсюда пойдёт отсчёт до ухода с экрана
+    o.graceUntil = beatAt(S.now()) + BEATS_PER_BAR;   // такт форы, чтобы вернуть
     st.combo = 0;
     st.errorsThisBar++;
     st.score = Math.max(0, st.score + SCORE_LOST);
@@ -400,10 +439,12 @@
     S.init();
     S.resume();
     st.mode = 'play';
+    st.paused = false;
+    el.pause.hidden = true;
     reset();
     el.title.classList.add('gone');
     setTimeout(function () {
-      if (st.hinted === 0) showHint('кликните по кругу, когда кольцо коснётся его края');
+      if (st.hinted === 0) showHint('кликните по плитке, когда контур коснётся её края');
     }, 1200);
   }
 
@@ -457,6 +498,9 @@
     start();
   });
 
+  el.pauseResume.addEventListener('click', function () { setPaused(false); });
+  el.pauseQuit.addEventListener('click', function () { toTitle(); });
+
   cv.addEventListener('pointerdown', onPointerDown);
 
   function trackPointer(ev) {
@@ -470,9 +514,6 @@
   cv.addEventListener('mousemove', trackPointer);          // подстраховка
   cv.addEventListener('pointerleave', function () { pointer.over = false; });
   cv.addEventListener('mouseleave', function () { pointer.over = false; });
-
-  el.pauseResume.addEventListener('click', function () { setPaused(false); });
-  el.pauseQuit.addEventListener('click', function () { toTitle(); });
 
   window.addEventListener('keydown', function (e) {
     if (st.mode !== 'play') return;
@@ -519,25 +560,13 @@
       if (!o.visible && beat >= o.introBeat) {
         o.visible = true;
         o.appearAt = t;
-        o.dormantSince = beat;
+        o.graceUntil = beat + GRACE_BARS * BEATS_PER_BAR;
+        if (o.order === 1 && st.hinted < 2) {
+          st.hinted = 2;
+          showHint('прежние не бросайте: молчащая плитка тянет счёт вниз каждую долю');
+        }
       }
       if (!o.visible) return;
-
-      // выключенный не занимает экран вечно: уходит и предлагается снова
-      if (o.leavingAt) {
-        if (t - o.leavingAt >= FADE) {
-          o.visible = false;
-          o.leavingAt = 0;
-          o.dormantSince = null;
-          o.introBeat = beat + INTRO_BARS * BEATS_PER_BAR;
-        }
-        return;
-      }
-      if (!o.alive && o.dormantSince !== null &&
-          beat - o.dormantSince >= DORMANT_BARS * BEATS_PER_BAR) {
-        o.leavingAt = t;
-        return;
-      }
 
       // угасание: даём доиграть окно попадания последней доли-шанса
       if (o.alive && t > timeAt((o.until + 1) * o.period) + GOOD) expire(o);
@@ -552,20 +581,39 @@
       o.flash = Math.max(0, o.flash - dt * 2.6);
       o.shake = Math.max(0, o.shake - dt * 3.2);
       o.warnFlash = Math.max(0, o.warnFlash - dt * 1.6);
+      o.bleed = Math.max(0, o.bleed - dt * 1.4);
       o.ripples = o.ripples.filter(function (r) { return t - r.t < 1.25; });
     });
 
-    // границы такта: премия за такт, в котором все слои держатся уверенно
+    // утечка: каждая доля молчания стоит очков
+    var bi = Math.floor(beat);
+    if (st.lastBeatInt === null) st.lastBeatInt = bi;
+    var steps = 0;
+    while (st.lastBeatInt < bi && steps++ < 64) {
+      st.lastBeatInt++;
+      st.objs.forEach(function (o) {
+        if (!bleeding(o, beat)) return;
+        st.score = Math.max(0, st.score - DRAIN);
+        o.drainBar += DRAIN;
+        o.bleed = 1;
+      });
+    }
+
+    // границы такта: премия за такт, где всё держится, и сводка по утечке
     var bar = Math.floor(beat / BEATS_PER_BAR);
     if (bar !== st.lastBar) {
       if (st.lastBar >= 0) {
         var live = st.objs.filter(function (o) { return o.alive; });
-        var confident = live.length && live.every(function (o) {
+        var silent = st.objs.filter(function (o) { return bleeding(o, beat); });
+        var confident = live.length && !silent.length && live.every(function (o) {
           return chargeFrac(o, beat) > WARN / LIFE;
         });
         if (confident && st.errorsThisBar === 0) {
           targetBpm = Math.min(BPM_MAX, targetBpm + BPM_BONUS);
         }
+        st.objs.forEach(function (o) {
+          if (o.drainBar > 0) { pop(o, '−' + o.drainBar, false); o.drainBar = 0; }
+        });
       }
       st.lastBar = bar;
       st.errorsThisBar = 0;
@@ -595,6 +643,29 @@
   }
 
   /* ---------------- отрисовка ---------------- */
+
+  /* Путь начинается в верхней точке по центру и идёт по часовой — так дуга
+     заряда, нарисованная пунктиром по периметру, стартует сверху. */
+  function tilePath(cx, cy, size, r) {
+    var h = size / 2;
+    var x0 = cx - h, y0 = cy - h, x1 = cx + h, y1 = cy + h;
+    r = Math.max(0, Math.min(r, h));
+    g.beginPath();
+    g.moveTo(cx, y0);
+    g.lineTo(x1 - r, y0);
+    g.arcTo(x1, y0, x1, y0 + r, r);
+    g.lineTo(x1, y1 - r);
+    g.arcTo(x1, y1, x1 - r, y1, r);
+    g.lineTo(x0 + r, y1);
+    g.arcTo(x0, y1, x0, y1 - r, r);
+    g.lineTo(x0, y0 + r);
+    g.arcTo(x0, y0, x0 + r, y0, r);
+    g.closePath();
+  }
+
+  function perimeter(size, r) {
+    return 4 * (size - 2 * r) + 2 * Math.PI * r;
+  }
 
   function background(t) {
     var live = st.objs.filter(function (o) { return o.alive; });
@@ -627,37 +698,34 @@
     st.objs.forEach(function (o) {
       if (!o.visible) return;
       var inst = INSTR[o.kind];
-      var a = o.leavingAt
-        ? Math.max(0, 1 - (t - o.leavingAt) / FADE)          // мягкий уход
-        : Math.min(1, (t - o.appearAt) / FADE);              // мягкий вход
+      var a = Math.min(1, (t - o.appearAt) / FADE);
       var p = beat / o.period; p = p - Math.floor(p);
       var jitter = o.shake > 0 ? Math.sin(t * 90) * o.shake * 5 : 0;
       var x = o.x + jitter, y = o.y;
 
       var frac = chargeFrac(o, beat);
       var warning = o.alive && frac <= WARN / LIFE;
-      var lastChance = o.alive && frac <= 1 / LIFE;         // следующая доля — последняя
+      var lastChance = o.alive && frac <= 1 / LIFE;
       var urgency = warning ? 1 - frac / (WARN / LIFE) : 0;
-      // цвет почти не теряется: угасающий должен быть настойчивее, а не незаметнее,
-      // иначе он читается как невключённый
+      var leak = bleeding(o, beat);
       var satScale = o.alive ? 0.75 + 0.25 * frac : 1;
 
       o.ripples.forEach(function (r) {
         var k = (t - r.t) / 1.25;
         if (k > 1) return;
-        g.beginPath();
-        g.arc(x, y, o.r + k * 130 * r.s, 0, Math.PI * 2);
-        g.strokeStyle = syncedColor(inst, (1 - k) * 0.3 * r.s * a, 0, satScale);
+        var s = o.size + k * 88 * r.s;   // в сетке волна должна жить внутри своей ячейки
+        tilePath(x, y, s, o.radius * (s / o.size));
+        g.strokeStyle = syncedColor(inst, (1 - k) * 0.28 * r.s * a, 0, satScale);
         g.lineWidth = 1.4 * (1 - k);
         g.stroke();
       });
 
-      // приближающееся кольцо — фаза, читаемая глазом
+      // приближающийся контур — фаза, читаемая глазом
+      var k2 = Math.pow(p, 1.25);
       var ringA = Math.pow(p, 2.2);
       var land = p > 0.88 ? (p - 0.88) / 0.12 : 0;
       var antic = Math.pow(p, 10);
-      g.beginPath();
-      g.arc(x, y, Math.max(o.r * Math.pow(p, 1.25), 0.5), 0, Math.PI * 2);
+      tilePath(x, y, Math.max(o.size * k2, 1), o.radius * k2);
       g.strokeStyle = lastChance
         ? 'hsla(12,58%,50%,' + ((0.3 + 0.65 * ringA) * a) + ')'   // «сюда, сейчас»
         : o.alive
@@ -667,53 +735,76 @@
       g.stroke();
 
       if (warning) {
-        // тревожный ореол пульсирует на каждой своей доле — видно, какой круг просит
-        g.beginPath();
-        g.arc(x, y, o.r + 17 + o.warnFlash * 6, 0, Math.PI * 2);
+        // тревожный ореол пульсирует на каждой своей доле
+        tilePath(x, y, o.size + 34 + o.warnFlash * 12, o.radius + 17);
         g.strokeStyle = 'hsla(12,58%,52%,' +
           ((0.1 + 0.45 * o.warnFlash) * (0.45 + 0.55 * urgency) * a).toFixed(3) + ')';
         g.lineWidth = 1.4 + o.warnFlash * 2.4;
         g.stroke();
       }
 
+      if (leak) {
+        // молчащая плитка не уходит, а тянет очки — и видно, что она тянет
+        tilePath(x, y, o.size + 18 + o.bleed * 8, o.radius + 9);
+        g.strokeStyle = 'hsla(12,45%,52%,' + ((0.12 + 0.3 * o.bleed) * a).toFixed(3) + ')';
+        g.lineWidth = 1.2 + o.bleed * 1.6;
+        g.stroke();
+      }
+
+      // тело плитки
+      tilePath(x, y, o.size, o.radius);
       if (o.alive) {
-        g.beginPath();
-        g.arc(x, y, o.r, 0, Math.PI * 2);
         g.fillStyle = syncedColor(inst, (0.09 + o.flash * 0.15) * a, 0, satScale);
         g.fill();
         g.strokeStyle = warning
           ? 'hsla(12,50%,48%,' + ((0.45 + 0.35 * urgency + o.flash * 0.3) * a).toFixed(3) + ')'
           : syncedColor(inst, (0.6 + antic * 0.2 + o.flash * 0.4) * a, -o.flash * 6, satScale);
         g.lineWidth = 1.6 + o.flash * 1.6 + urgency * 1.2;
-        g.stroke();
+      } else {
+        g.fillStyle = leak
+          ? 'hsla(12,30%,60%,' + (0.07 * a) + ')'
+          : 'hsla(28,7%,50%,' + (0.03 * a) + ')';
+        g.fill();
+        g.strokeStyle = leak
+          ? 'hsla(12,45%,48%,' + ((0.4 + 0.25 * o.bleed) * a).toFixed(3) + ')'
+          : 'hsla(28,7%,40%,' + ((0.42 + antic * 0.25) * a) + ')';
+        g.lineWidth = 1.4;
+      }
+      g.stroke();
 
-        // дуга заряда: полная сразу после подтверждения, пустая на доле-шансе.
-        // в тревоге держим минимальную длину, иначе она исчезает ровно тогда,
-        // когда нужнее всего
+      // дуга заряда по периметру плитки: полная сразу после подтверждения,
+      // пустая на доле-шансе. В тревоге держим минимальную длину, иначе она
+      // исчезает ровно тогда, когда нужнее всего
+      if (o.alive) {
+        var gs = o.size + 18, gr = o.radius + 9;
+        var per = perimeter(gs, gr);
         var shown = warning ? Math.max(frac, 0.05) : frac;
-        g.beginPath();
-        g.arc(x, y, o.r + 9, -Math.PI / 2, -Math.PI / 2 + shown * Math.PI * 2);
+        g.save();
+        g.setLineDash([shown * per, per]);
+        tilePath(x, y, gs, gr);
         g.strokeStyle = warning
           ? 'hsla(12,58%,50%,' + ((0.55 + 0.4 * o.warnFlash) * a).toFixed(3) + ')'
-          : syncedColor(inst, 0.45 * a, 0, satScale);
+          : syncedColor(inst, 0.5 * a, 0, satScale);
         g.lineWidth = warning ? 2.8 + o.warnFlash * 1.8 + urgency * 1.4 : 2;
         g.stroke();
-
-        g.beginPath();
-        g.arc(x, y, 2.8 + o.flash * 2.6, 0, Math.PI * 2);
-        g.fillStyle = syncedColor(inst, 0.85 * a, 0, satScale);
-        g.fill();
-      } else {
-        g.beginPath();
-        g.arc(x, y, o.r, 0, Math.PI * 2);
-        g.strokeStyle = 'hsla(28,7%,40%,' + ((0.42 + antic * 0.25) * a) + ')';
-        g.lineWidth = 1.4;
-        g.stroke();
-        g.beginPath();
-        g.arc(x, y, 2.2, 0, Math.PI * 2);
-        g.fillStyle = 'hsla(28,7%,40%,' + (0.5 * a) + ')';
-        g.fill();
+        g.restore();
       }
+
+      // ядро и цена инструмента; цена — у нижнего края, где растущий контур
+      // почти прозрачен и не спорит с цифрой
+      g.beginPath();
+      g.arc(x, y, o.alive ? 2.8 + o.flash * 2.6 : 2.2, 0, Math.PI * 2);
+      g.fillStyle = o.alive
+        ? syncedColor(inst, 0.85 * a, 0, satScale)
+        : 'hsla(28,7%,40%,' + (0.5 * a) + ')';
+      g.fill();
+
+      g.textAlign = 'center';
+      g.font = '12px -apple-system, BlinkMacSystemFont, Helvetica Neue, sans-serif';
+      g.fillStyle = o.alive
+        ? syncedColor(inst, 0.6 * a, 0, satScale)
+        : 'hsla(28,7%,45%,' + (0.4 * a) + ')';
+      g.fillText('×' + o.factor, x, y + o.half - 14);
     });
 
     // всплывающие очки
@@ -730,7 +821,7 @@
 
   /* ---------------- цикл ---------------- */
 
-  window.__VT = { st: st, clock: clock, INSTR: INSTR, COMPOSITION: COMPOSITION,
+  window.__VT = { st: st, clock: clock, INSTR: INSTR, COMPOSITION: COMPOSITION, GRID: GRID,
                   beatAt: beatAt, timeAt: timeAt, tempo: function () { return targetBpm; } };
 
   var last = 0;
