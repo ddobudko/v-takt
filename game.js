@@ -38,6 +38,8 @@
   /* послабление за взятие должно отыгрываться обратно за интервал до следующего
      входа, иначе темп садится в пол и больше не встаёт */
 
+  var OVER_CYCLES = 3;   // взятый инструмент молчит столько своих кругов — конец
+
   var SCORE_ON = 200, SCORE_HIT = 100, SCORE_GOOD = 60;
   var SCORE_MISS = -50, SCORE_LOST = -150;
   var DRAIN = 12;        // очков за долю с каждого молчащего инструмента
@@ -57,6 +59,12 @@
     pause: document.getElementById('pause'),
     pauseResume: document.getElementById('pause-resume'),
     pauseQuit: document.getElementById('pause-quit'),
+    over: document.getElementById('over'),
+    overWho: document.getElementById('over-who'),
+    overScore: document.getElementById('over-score'),
+    overBest: document.getElementById('over-best'),
+    overAgain: document.getElementById('over-again'),
+    overMenu: document.getElementById('over-menu'),
     nameForm: document.getElementById('name-form'),
     nameInput: document.getElementById('name-input'),
     welcome: document.getElementById('welcome'),
@@ -73,11 +81,13 @@
   var INSTR = {
     kick: {
       hue: 222, sat: 24, light: 42,
+      title: 'пульс',
       play: function (t, i, bd) { S.kick(t, 0.85); S.kick(t + bd, 0.5); },
       accent: function (t) { S.kick(t, 0.8); }
     },
     hat: {
       hue: 200, sat: 16, light: 54,
+      title: 'хэт',
       play: function (t, i, bd) {
         S.hat(t + 0.5 * bd, 0.3);
         S.hat(t + 1.5 * bd, 0.22);
@@ -87,11 +97,13 @@
     },
     rim: {
       hue: 14, sat: 32, light: 55,
+      title: 'полиритм',
       play: function (t, i, bd) { S.rim(t, 0.5); S.rim(t + 1.5 * bd, 0.3); },
       accent: function (t) { S.rim(t, 0.45); }
     },
     bass: {
       hue: 246, sat: 34, light: 47,
+      title: 'бас',
       seq: [[45, 50], [45, 48], [43, 50], [45, 52]],
       play: function (t, i, bd) {
         var p = this.seq[i % this.seq.length];
@@ -102,6 +114,7 @@
     },
     pluck: {
       hue: 36, sat: 50, light: 51,
+      title: 'мелодия',
       ph: [
         [[0, 69], [1.5, 72], [2.5, 76]],
         [[0, 74], [1, 72], [2.5, 69]],
@@ -117,18 +130,21 @@
     },
     bell: {
       hue: 166, sat: 30, light: 45,
+      title: 'колокол',
       seq: [81, 76, 79, 84],
       play: function (t, i) { S.bell(t, this.seq[i % this.seq.length], 0.22); },
       accent: function (t) { S.bell(t, 81, 0.2); }
     },
     pad: {
       hue: 190, sat: 22, light: 51,
+      title: 'пад',
       ch: [[57, 60, 64], [55, 60, 64]],
       play: function (t, i, bd) { S.pad(t, this.ch[i % 2], 0.13, 8 * bd); },
       accent: function (t, bd) { S.pad(t, [57, 60, 64], 0.1, 2 * bd); }
     },
     tom: {
       hue: 320, sat: 26, light: 48,
+      title: 'том',
       play: function (t, i, bd) {
         S.tom(t, 45, 0.4);
         S.tom(t + 3.5 * bd, i % 2 ? 40 : 43, 0.28);
@@ -137,6 +153,7 @@
     },
     glass: {
       hue: 100, sat: 22, light: 46,
+      title: 'стекло',
       ph: [
         [[0, 84], [2.5, 91], [4, 88]],
         [[0, 88], [3, 93], [5.5, 84]],
@@ -210,6 +227,7 @@
     score: 0,
     combo: 0,
     sync: 0.25,
+    tension: 0,
     player: null,
     best: 0,
     beaten: false,
@@ -235,6 +253,7 @@
         graceUntil: 0,
         visible: false, appearAt: 0,
         alive: false, everTaken: false, until: -1,
+        silentSince: null,
         drainBar: 0,
         lastPhase: 0, flash: 0, shake: 0, warnFlash: 0, bleed: 0, ripples: []
       };
@@ -252,6 +271,7 @@
     st.errorsThisBar = 0;
     st.pops = [];
     st.hinted = 0;
+    st.tension = 0;
     st.best = st.player ? VTStore.best(st.player) : 0;
     st.beaten = false;
     st.lastSaved = 0;
@@ -379,6 +399,7 @@
         targetBpm = Math.max(BPM_MIN,
           targetBpm - (target.everTaken ? BPM_TAKE_BACK : BPM_TAKE_NEW));
         target.everTaken = true;
+        target.silentSince = null;      // отсчёт до конца игры сброшен
       } else {
         gain = perfect ? SCORE_HIT : SCORE_GOOD;
         if (was > TOPPED_UP) gain = Math.round(gain * 0.4);  // не давать долбить одну плитку
@@ -414,6 +435,8 @@
     o.until = -1;
     o.shake = 1;
     o.graceUntil = beatAt(S.now()) + BEATS_PER_BAR;   // такт форы, чтобы вернуть
+    // отсчёт до конца игры идёт только по тому, что игрок уже брал
+    if (o.everTaken) o.silentSince = beatAt(S.now());
     st.combo = 0;
     st.errorsThisBar++;
     st.score = Math.max(0, st.score + SCORE_LOST);
@@ -474,11 +497,32 @@
     st.mode = 'play';
     st.paused = false;
     el.pause.hidden = true;
+    el.over.hidden = true;
     reset();
     el.title.classList.add('gone');
     setTimeout(function () {
       if (st.hinted === 0) showHint('кликните по плитке, когда контур коснётся её края');
     }, 1200);
+  }
+
+  function gameOver(o) {
+    if (st.mode !== 'play') return;
+    st.mode = 'over';
+    st.paused = false;
+    saveNow();
+    setCursor('');
+    el.hint.classList.remove('on');
+    el.pause.hidden = true;
+    el.overWho.textContent = INSTR[o.kind].title;
+    el.overScore.textContent = num(st.score);
+    el.overBest.textContent = st.score >= st.best
+      ? 'это новый рекорд'
+      : 'рекорд — ' + num(st.best);
+    el.over.hidden = false;
+    var at = S.ctxNow() + 0.05;
+    S.expire(at);
+    S.bell(at + 0.34, 57, 0.13);
+    S.bell(at + 0.68, 52, 0.11);
   }
 
   function setPaused(on) {
@@ -493,6 +537,7 @@
     saveNow();
     setPaused(false);
     el.pause.hidden = true;
+    el.over.hidden = true;
     setCursor('');
     st.mode = 'title';
     st.objs = [];
@@ -533,6 +578,8 @@
 
   el.pauseResume.addEventListener('click', function () { setPaused(false); });
   el.pauseQuit.addEventListener('click', function () { toTitle(); });
+  el.overAgain.addEventListener('click', function () { start(); });
+  el.overMenu.addEventListener('click', function () { toTitle(); });
 
   cv.addEventListener('pointerdown', onPointerDown);
 
@@ -549,8 +596,14 @@
   cv.addEventListener('mouseleave', function () { pointer.over = false; });
 
   window.addEventListener('keydown', function (e) {
+    var again = e.key === 'r' || e.key === 'R' || e.key === 'к' || e.key === 'К';
+    if (st.mode === 'over') {
+      if (again) start();
+      else if (e.key === 'Escape') toTitle();
+      return;
+    }
     if (st.mode !== 'play') return;
-    if (e.key === 'r' || e.key === 'R' || e.key === 'к' || e.key === 'К') {
+    if (again) {
       saveNow();
       setPaused(false);
       reset();
@@ -654,6 +707,24 @@
 
     st.pops = st.pops.filter(function (q) { return t - q.t < 0.95; });
 
+    // напряжение ведёт палитру фона, и оно же — предвестник конца
+    var visible = st.objs.filter(function (o) { return o.visible; });
+    var silent = visible.filter(function (o) { return !o.alive; });
+    var warned = 0, doom = 0, doomed = null;
+    st.objs.forEach(function (o) {
+      if (o.alive && chargeFrac(o, beat) <= WARN / LIFE) warned++;
+      if (o.silentSince === null || o.alive) return;
+      var d = (beat - o.silentSince) / (OVER_CYCLES * o.period);
+      if (d > doom) { doom = d; doomed = o; }
+    });
+    var target = Math.min(1,
+      0.78 * doom +
+      0.42 * (visible.length ? silent.length / visible.length : 0) +
+      0.18 * (visible.length ? warned / visible.length : 0));
+    st.tension += (target - st.tension) * Math.min(1, dt * 1.8);
+
+    if (doomed && doom >= 1) { gameOver(doomed); return; }
+
     // рекорд обновляется прямо по ходу захода, а не в конце: игра бесконечная,
     // «конца» у неё нет, и терять результат при закрытии вкладки нельзя
     if (st.player && st.score > st.best) {
@@ -700,28 +771,78 @@
     return 4 * (size - 2 * r) + 2 * Math.PI * r;
   }
 
-  function background(t) {
-    var live = st.objs.filter(function (o) { return o.alive; });
-    var hue = 40, sat = 6;
-    if (live.length) {
-      var sx = 0, sy = 0;
-      live.forEach(function (o) {
-        var h = INSTR[o.kind].hue * Math.PI / 180;
-        sx += Math.cos(h); sy += Math.sin(h);
-      });
-      hue = (Math.atan2(sy, sx) * 180 / Math.PI + 360) % 360;
-      sat = 9 * st.sync;
+  /* ---------------- мэш-градиент на фоне ----------------
+     Пять радиальных пятен, каждое со своим медленным дрейфом. Рисуем их в
+     маленький офскрин и растягиваем со сглаживанием: размытие достаётся
+     даром, а полноразмерные заливки каждый кадр обошлись бы дорого.
+     Палитра ведётся напряжением: спокойно — серо-зелёно-голубое, тревожно —
+     жёлтое и оранжевое, на грани конца — красное. */
+
+  var mesh = document.createElement('canvas');
+  mesh.width = 320;      // мельче — и на растяжке до полного экрана видны полосы
+  mesh.height = 200;
+  var mg = mesh.getContext('2d');
+
+  /* Пятна нарочно некрупные и разнесённые: если каждое накрывает весь холст,
+     они усредняются в одну плашку и мэша не видно. sat — доля насыщенности,
+     у первого почти ноль, это и есть «серый» в спокойной палитре. */
+  var BLOBS = [
+    { fx: 0.043, fy: 0.031, px: 0.0, py: 1.7, r: 0.52, ax: 0.52, ay: 0.46, sat: 0.30 },
+    { fx: 0.027, fy: 0.052, px: 2.3, py: 0.4, r: 0.44, ax: 0.56, ay: 0.42, sat: 1.00 },
+    { fx: 0.061, fy: 0.023, px: 4.1, py: 3.2, r: 0.48, ax: 0.48, ay: 0.52, sat: 0.78 },
+    { fx: 0.034, fy: 0.045, px: 5.6, py: 1.1, r: 0.40, ax: 0.54, ay: 0.50, sat: 0.55 },
+    { fx: 0.019, fy: 0.037, px: 1.2, py: 4.8, r: 0.58, ax: 0.44, ay: 0.40, sat: 0.92 }
+  ];
+
+  //           серо-синий  зелёный  голубой  индиго  бирюзовый
+  var CALM = [215, 142, 196, 234, 168];
+  var WARM = [52,   36,  60,  44,   30];
+  var HOT  = [10,    2,  18,   6,   14];
+
+  function lerp(a, b, k) { return a + (b - a) * k; }
+
+  function blobHue(i, tension) {
+    return tension < 0.5
+      ? lerp(CALM[i], WARM[i], tension / 0.5)
+      : lerp(WARM[i], HOT[i], (tension - 0.5) / 0.5);
+  }
+
+  function drawMesh(t, tension, beatDip) {
+    var w = mesh.width, h = mesh.height;
+    var paperHue = lerp(48, 16, tension);
+    mg.globalCompositeOperation = 'source-over';
+    mg.fillStyle = 'hsl(' + paperHue.toFixed(0) + ',' +
+      (7 + 16 * tension).toFixed(1) + '%,' + (96.4 - 3.2 * tension - beatDip).toFixed(2) + '%)';
+    mg.fillRect(0, 0, w, h);
+
+    var sat = 26 + 34 * tension;
+    var light = 92 - 14 * tension;
+    var alpha = 0.5 + 0.24 * tension;
+
+    for (var i = 0; i < BLOBS.length; i++) {
+      var b = BLOBS[i];
+      var x = (0.5 + b.ax * Math.sin(t * b.fx * Math.PI * 2 + b.px)) * w;
+      var y = (0.5 + b.ay * Math.cos(t * b.fy * Math.PI * 2 + b.py)) * h;
+      var r = b.r * Math.max(w, h) * (1 + 0.14 * Math.sin(t * 0.11 + i));
+      var hue = blobHue(i, tension).toFixed(0);
+      var head = 'hsla(' + hue + ',' + (sat * b.sat).toFixed(1) + '%,' + light.toFixed(1) + '%,';
+      var grad = mg.createRadialGradient(x, y, 0, x, y, r);
+      grad.addColorStop(0, head + alpha.toFixed(3) + ')');
+      grad.addColorStop(0.55, head + (alpha * 0.42).toFixed(3) + ')');
+      grad.addColorStop(1, head + '0)');
+      mg.fillStyle = grad;
+      mg.fillRect(0, 0, w, h);
     }
-    var bp = beatAt(t);
-    bp = bp - Math.floor(bp);
-    var dip = live.length ? Math.pow(1 - bp, 6) * 0.9 * st.sync : 0;
-    return 'hsl(' + hue.toFixed(0) + ',' + sat.toFixed(1) + '%,' + (96.4 - dip).toFixed(2) + '%)';
   }
 
   function draw(t) {
     g.setTransform(1, 0, 0, 1, 0, 0);
-    g.fillStyle = st.mode === 'title' ? '#f6f5f2' : background(t);
-    g.fillRect(0, 0, cv.width, cv.height);
+    var bp = beatAt(t);
+    bp = bp - Math.floor(bp);
+    var dip = st.objs.length ? Math.pow(1 - bp, 6) * 0.9 * st.sync : 0;
+    drawMesh(t, st.tension, dip);
+    g.imageSmoothingEnabled = true;
+    g.drawImage(mesh, 0, 0, cv.width, cv.height);
     if (!st.objs.length) return;
 
     var d = st.dpr;
@@ -855,16 +976,21 @@
   /* ---------------- цикл ---------------- */
 
   window.__VT = { st: st, clock: clock, INSTR: INSTR, COMPOSITION: COMPOSITION, GRID: GRID,
-                  beatAt: beatAt, timeAt: timeAt, tempo: function () { return targetBpm; } };
+                  beatAt: beatAt, timeAt: timeAt, tempo: function () { return targetBpm; },
+                  mesh: mesh, drawMesh: drawMesh };
 
   var last = 0;
   function frame() {
     requestAnimationFrame(frame);
     if (S.ready()) st.perfToCtx = S.ctxNow() - performance.now() / 1000;
-    var t = S.ready() ? S.now() : 0;
+    // до включения звука фон всё равно должен жить — берём часы страницы
+    var t = S.ready() ? S.now() : performance.now() / 1000;
     var dt = last ? Math.min(0.05, t - last) : 0;
     last = t;
     if (st.mode === 'play' && !st.paused && S.ready()) update(t, dt);
+    // фон живёт во всех режимах: на конце доводим до красного, на титуле — до покоя
+    if (st.mode === 'over') st.tension += (1 - st.tension) * Math.min(1, dt * 1.2);
+    else if (st.mode === 'title') st.tension += (0 - st.tension) * Math.min(1, dt * 1.2);
     updateCursor();
     draw(t);
   }

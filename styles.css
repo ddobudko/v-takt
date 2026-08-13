@@ -108,11 +108,35 @@ body {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 34px;
-  background: rgba(246, 245, 242, 0.9);
+  gap: 22px;
+  background: rgba(246, 245, 242, 0.86);   /* мэш просвечивает сквозь пелену */
   pointer-events: auto;
   animation: veil 0.35s ease;
 }
+
+.over-line {
+  font-size: 14px;
+  letter-spacing: 0.06em;
+  color: #16150f;
+}
+
+.over-score {
+  font-size: 22px;
+  font-weight: 300;
+  letter-spacing: 0.1em;
+  color: #4e4c46;
+  font-variant-numeric: tabular-nums;
+}
+.over-score span { font-size: 26px; }
+
+.over-best {
+  font-size: 12px;
+  letter-spacing: 0.14em;
+  color: #a3a099;
+  font-variant-numeric: tabular-nums;
+}
+
+.pause-actions { margin-top: 12px; }
 
 @keyframes veil {
   from { opacity: 0; }
@@ -153,7 +177,7 @@ body {
   align-items: center;
   justify-content: center;
   gap: 22px;
-  background: #f6f5f2;
+  background: rgba(246, 245, 242, 0.9);
   transition: opacity 0.9s ease;
   pointer-events: auto;
   cursor: pointer;

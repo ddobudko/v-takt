@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>втакт</title>
-<link rel="stylesheet" href="styles.css?v=11">
+<link rel="stylesheet" href="styles.css?v=12">
 </head>
 <body>
   <canvas id="stage"></canvas>
@@ -21,6 +21,17 @@
     </div>
     <div id="hud-keys" class="hud hud-keys">space — пауза&nbsp;&nbsp;·&nbsp;&nbsp;r — заново</div>
     <div id="hint" class="hint"></div>
+
+    <div id="over" class="pause-screen" hidden>
+      <div class="pause-word">конец</div>
+      <div class="over-line"><span id="over-who"></span> молчал три круга</div>
+      <div class="over-score">счёт&nbsp;&nbsp;<span id="over-score">0</span></div>
+      <div id="over-best" class="over-best"></div>
+      <div class="pause-actions">
+        <button id="over-again" class="pause-btn" type="button">заново</button>
+        <button id="over-menu" class="pause-btn" type="button">в меню</button>
+      </div>
+    </div>
 
     <div id="pause" class="pause-screen" hidden>
       <div class="pause-word">пауза</div>
@@ -51,8 +62,8 @@
   </div>
 
   <!-- ?v= — против кэша GitHub Pages (max-age=600): поднимать при правках -->
-  <script src="store.js?v=11"></script>
-  <script src="audio.js?v=11"></script>
-  <script src="game.js?v=11"></script>
+  <script src="store.js?v=12"></script>
+  <script src="audio.js?v=12"></script>
+  <script src="game.js?v=12"></script>
 </body>
 </html>
