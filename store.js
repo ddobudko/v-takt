@@ -52,12 +52,24 @@
     getVolume: function () { var v = pref('volume'); return typeof v === 'number' ? v : 0.8; },
     setVolume: function (v) { pref('volume', v); },
 
+    /* Имя живёт в localStorage, а не в куке. На itch.io игра крутится в
+       iframe на чужом домене, и браузеры со строгой политикой стороннего
+       хранилища куку туда просто не пускают — имя терялось бы при каждом
+       заходе. Куку читаем один раз, чтобы перенести уже сохранённое. */
     getPlayer: function () {
-      var n = readCookie(COOKIE);
+      var n = pref('player');
+      if (!n) {
+        var old = readCookie(COOKIE);
+        if (old && old.trim()) {
+          n = old.trim();
+          pref('player', n);
+          writeCookie(COOKIE, '', 0);
+        }
+      }
       return n && n.trim() ? n.trim() : null;
     },
-    setPlayer: function (name) { writeCookie(COOKIE, name, YEAR); },
-    forgetPlayer: function () { writeCookie(COOKIE, '', 0); },
+    setPlayer: function (name) { pref('player', name); },
+    forgetPlayer: function () { pref('player', ''); writeCookie(COOKIE, '', 0); },
 
     best: function (name) { return load()[name] || 0; },
 
