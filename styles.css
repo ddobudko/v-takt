@@ -174,6 +174,63 @@ body.on-title .hud { opacity: 0; }
 }
 .pause-btn:hover { color: #16150f; }
 
+/* --- настройки --- */
+
+.settings {
+  display: flex;
+  align-items: center;
+  gap: 28px;
+  pointer-events: auto;
+}
+
+.title-settings { margin-top: 30px; }
+
+.set-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  cursor: pointer;
+}
+
+.set-cap, .set-btn {
+  font-size: 10px;
+  letter-spacing: 0.2em;
+  color: #8d8a82;
+  border: none;
+  background: transparent;
+  font-family: inherit;
+  padding: 4px 0;
+  transition: color 0.3s ease;
+}
+.set-btn { cursor: pointer; }
+.set-btn:hover, .set-row:hover .set-cap { color: #16150f; }
+
+.vol {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 108px;
+  height: 14px;
+  background: transparent;
+  cursor: pointer;
+}
+.vol::-webkit-slider-runnable-track {
+  height: 1px;
+  background: #c4c1b9;
+}
+.vol::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 9px;
+  height: 9px;
+  margin-top: -4px;
+  border-radius: 50%;
+  background: #6f6c65;
+  border: none;
+}
+.vol::-moz-range-track { height: 1px; background: #c4c1b9; }
+.vol::-moz-range-thumb {
+  width: 9px; height: 9px; border: none; border-radius: 50%; background: #6f6c65;
+}
+
 .title-screen {
   position: absolute;
   inset: 0;

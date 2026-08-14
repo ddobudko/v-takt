@@ -7,6 +7,7 @@
 
   var COOKIE = 'vtakt_player';
   var KEY = 'vtakt_scores';
+  var PREFS = 'vtakt_prefs';
   var YEAR = 365 * 86400;
 
   function readCookie(name) {
@@ -28,7 +29,29 @@
     try { localStorage.setItem(KEY, JSON.stringify(map)); } catch (e) {}
   }
 
+  function prefs() {
+    try { return JSON.parse(localStorage.getItem(PREFS)) || {}; }
+    catch (e) { return {}; }
+  }
+
+  function savePrefs(p) {
+    try { localStorage.setItem(PREFS, JSON.stringify(p)); } catch (e) {}
+  }
+
+  function pref(name, value) {
+    var p = prefs();
+    if (value === undefined) return p[name];
+    p[name] = value;
+    savePrefs(p);
+    return value;
+  }
+
   global.VTStore = {
+    getLang: function () { return pref('lang'); },
+    setLang: function (v) { pref('lang', v); },
+    getVolume: function () { var v = pref('volume'); return typeof v === 'number' ? v : 0.8; },
+    setVolume: function (v) { pref('volume', v); },
+
     getPlayer: function () {
       var n = readCookie(COOKIE);
       return n && n.trim() ? n.trim() : null;

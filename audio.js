@@ -12,6 +12,7 @@
   var BEAT = 60 / BPM;
 
   var ctx = null, master = null, outNode = null, revSend = null, noiseBuf = null;
+  var volume = 1;              // множитель громкости поверх сведения
   var lat = 0;
   var ready = false;
 
@@ -37,7 +38,7 @@
     ctx = new AC();
 
     master = ctx.createGain();
-    master.gain.value = 0.75;
+    master.gain.value = 0.75 * volume;
 
     // общий смягчитель верха: снимает жёсткость хэтов и колокольчиков,
     // не трогая тело инструментов
@@ -369,6 +370,13 @@
     BPM: BPM,
     init: init,
     resume: function () { if (ctx && ctx.state !== 'running') ctx.resume(); },
+    /* Громкость — множитель поверх сведения, поэтому баланс инструментов
+       между собой не меняется. Плавно, чтобы не щёлкало. */
+    setVolume: function (v) {
+      volume = Math.max(0, Math.min(1, v));
+      if (master) master.gain.setTargetAtTime(0.75 * volume, ctx.currentTime, 0.02);
+    },
+    getVolume: function () { return volume; },
     // пауза усыпляет сам контекст: currentTime замирает, и вся ритмическая
     // сетка вместе с ним — назначенные ноты не уезжают
     suspend: function () { if (ctx && ctx.state === 'running') ctx.suspend(); },

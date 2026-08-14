@@ -73,7 +73,10 @@
     changeName: document.getElementById('change-name')
   };
 
-  function num(n) { return n.toLocaleString('ru-RU'); }
+  /* tr, а не t: буквой t во всём файле зовётся время, и внутри функций
+     параметр перекрыл бы словарь */
+  var tr = I18N.t;
+  function num(n) { return n.toLocaleString(I18N.lang() === 'ru' ? 'ru-RU' : 'en-US'); }
 
   /* ---------------- инструменты ---------------- */
   /* play(t, i, bd) — фигура одного цикла, t = абсолютное время начала цикла */
@@ -81,13 +84,11 @@
   var INSTR = {
     kick: {
       hue: 222, sat: 24, light: 42,
-      title: 'пульс',
       play: function (t, i, bd) { S.kick(t, 0.85); S.kick(t + bd, 0.5); },
       accent: function (t) { S.kick(t, 0.8); }
     },
     hat: {
       hue: 200, sat: 16, light: 54,
-      title: 'хэт',
       play: function (t, i, bd) {
         S.hat(t + 0.5 * bd, 0.3);
         S.hat(t + 1.5 * bd, 0.22);
@@ -97,13 +98,11 @@
     },
     rim: {
       hue: 14, sat: 32, light: 55,
-      title: 'полиритм',
       play: function (t, i, bd) { S.rim(t, 0.5); S.rim(t + 1.5 * bd, 0.3); },
       accent: function (t) { S.rim(t, 0.45); }
     },
     bass: {
       hue: 246, sat: 34, light: 47,
-      title: 'бас',
       seq: [[45, 50], [45, 48], [43, 50], [45, 52]],
       play: function (t, i, bd) {
         var p = this.seq[i % this.seq.length];
@@ -114,7 +113,6 @@
     },
     pluck: {
       hue: 36, sat: 50, light: 51,
-      title: 'мелодия',
       ph: [
         [[0, 69], [1.5, 72], [2.5, 76]],
         [[0, 74], [1, 72], [2.5, 69]],
@@ -130,21 +128,18 @@
     },
     bell: {
       hue: 166, sat: 30, light: 45,
-      title: 'колокол',
       seq: [81, 76, 79, 84],
       play: function (t, i) { S.bell(t, this.seq[i % this.seq.length], 0.22); },
       accent: function (t) { S.bell(t, 81, 0.2); }
     },
     pad: {
       hue: 190, sat: 22, light: 51,
-      title: 'пад',
       ch: [[57, 60, 64], [55, 60, 64]],
       play: function (t, i, bd) { S.pad(t, this.ch[i % 2], 0.13, 8 * bd); },
       accent: function (t, bd) { S.pad(t, [57, 60, 64], 0.1, 2 * bd); }
     },
     tom: {
       hue: 320, sat: 26, light: 48,
-      title: 'том',
       play: function (t, i, bd) {
         S.tom(t, 45, 0.4);
         S.tom(t + 3.5 * bd, i % 2 ? 40 : 43, 0.28);
@@ -153,7 +148,6 @@
     },
     glass: {
       hue: 100, sat: 22, light: 46,
-      title: 'стекло',
       ph: [
         [[0, 84], [2.5, 91], [4, 88]],
         [[0, 88], [3, 93], [5.5, 84]],
@@ -442,7 +436,7 @@
       bumpSync(perfect ? 0.14 : 0.09);
       if (st.hinted === 0) {
         st.hinted = 1;
-        showHint('держите инструмент живым — подтверждайте попадание, пока дуга не опустела');
+        showHint(tr('hint.hold'));
       }
     } else {
       st.combo = 0;
@@ -485,7 +479,7 @@
   function paintBest() {
     var v = num(st.best);
     if (el.best.textContent !== v) el.best.textContent = v;
-    var cap = st.beaten ? 'новый рекорд' : 'рекорд';
+    var cap = tr(st.beaten ? 'hud.newBest' : 'hud.best');
     if (el.bestCap.textContent !== cap) el.bestCap.textContent = cap;
     el.bestBox.classList.toggle('beaten', st.beaten);
   }
@@ -503,8 +497,8 @@
     if (name) {
       el.welcomeName.textContent = name;
       el.welcomeBest.textContent = st.best > 0
-        ? 'ваш рекорд — ' + num(st.best)
-        : 'рекорда пока нет';
+        ? tr('title.best') + ' ' + num(st.best)
+        : tr('title.noBest');
       el.welcome.hidden = false;
       el.nameForm.hidden = true;
       el.changeName.hidden = false;
@@ -529,7 +523,7 @@
     reset();
     el.title.classList.add('gone');
     setTimeout(function () {
-      if (st.hinted === 0) showHint('кликните по плитке, когда контур коснётся её края');
+      if (st.hinted === 0) showHint(tr('hint.aim'));
     }, 1200);
   }
 
@@ -541,11 +535,11 @@
     setCursor('');
     el.hint.classList.remove('on');
     el.pause.hidden = true;
-    el.overWho.textContent = INSTR[o.kind].title;
+    el.overWho.textContent = tr('instr.' + o.kind);
     el.overScore.textContent = num(st.score);
     el.overBest.textContent = st.score >= st.best
-      ? 'это новый рекорд'
-      : 'рекорд — ' + num(st.best);
+      ? tr('over.newBest')
+      : tr('over.best') + ' ' + num(st.best);
     el.over.hidden = false;
     var at = S.ctxNow() + 0.05;
     S.expire(at);
@@ -604,6 +598,46 @@
     start();
   });
 
+  /* ---------------- настройки ---------------- */
+
+  function applyVolume(v, save) {
+    S.setVolume(v);
+    if (save) VTStore.setVolume(v);
+    var sliders = document.querySelectorAll('.vol');
+    for (var i = 0; i < sliders.length; i++) {
+      var want = String(Math.round(v * 100));
+      if (sliders[i].value !== want) sliders[i].value = want;
+    }
+  }
+
+  function toggleFullscreen() {
+    if (document.fullscreenElement) document.exitFullscreen();
+    else if (document.documentElement.requestFullscreen) {
+      document.documentElement.requestFullscreen().catch(function () {});
+    }
+  }
+
+  (function wireSettings() {
+    var sliders = document.querySelectorAll('.vol');
+    for (var i = 0; i < sliders.length; i++) {
+      sliders[i].addEventListener('input', function (e) {
+        applyVolume(e.target.value / 100, true);
+      });
+    }
+    var full = document.querySelectorAll('.full-btn');
+    for (var j = 0; j < full.length; j++) {
+      full[j].addEventListener('click', toggleFullscreen);
+    }
+    var langs = document.querySelectorAll('.lang-btn');
+    for (var k = 0; k < langs.length; k++) {
+      langs[k].addEventListener('click', function () {
+        I18N.toggle();
+        initTitle();          // приветствие и рекорд собираются из строк
+      });
+    }
+    applyVolume(VTStore.getVolume(), false);
+  })();
+
   el.pauseResume.addEventListener('click', function () { setPaused(false); });
   el.pauseQuit.addEventListener('click', function () { toTitle(); });
   el.overAgain.addEventListener('click', function () { start(); });
@@ -624,6 +658,7 @@
   cv.addEventListener('mouseleave', function () { pointer.over = false; });
 
   window.addEventListener('keydown', function (e) {
+    if (e.code === 'KeyF' && st.mode !== 'title') { e.preventDefault(); toggleFullscreen(); return; }
     var again = e.key === 'r' || e.key === 'R' || e.key === 'к' || e.key === 'К';
     if (st.mode === 'over') {
       if (again) start();
@@ -655,6 +690,7 @@
     if (document.hidden) { saveNow(); setPaused(true); }   // ушли со вкладки — не теряем состав
   });
 
+  I18N.apply();
   initTitle();
 
   /* ---------------- размер ---------------- */
@@ -686,7 +722,7 @@
         o.graceUntil = beat + GRACE_BARS * BEATS_PER_BAR;
         if (o.order === 1 && st.hinted < 2) {
           st.hinted = 2;
-          showHint('прежние не бросайте: молчащая плитка тянет счёт вниз каждую долю');
+          showHint(tr('hint.keep'));
         }
       }
       if (!o.visible) return;
@@ -1087,7 +1123,7 @@
       if ('letterSpacing' in g) g.letterSpacing = '0.12em';
       g.font = '11px -apple-system, BlinkMacSystemFont, Helvetica Neue, sans-serif';
       g.fillStyle = ink;
-      g.fillText(inst.title, x, y - o.half + 25);
+      g.fillText(tr('instr.' + o.kind), x, y - o.half + 25);
       g.restore();
 
       // клавиша — в углу, чтобы не спорила с подписью по центру
