@@ -907,13 +907,12 @@
   var mpx = [0, 0, 0, 0], mpy = [0, 0, 0, 0];
   var mcr = [0, 0, 0, 0], mcg = [0, 0, 0, 0], mcb = [0, 0, 0, 0];
 
-  /* Цвет поля считается для точек, а не для заливки. Точки покрывают ~4 %
-     площади и стоят на половинной прозрачности, поэтому бледный цвет,
-     годившийся для сплошного фона, здесь пропадает полностью: сетку видно
-     только если сама точка заметно темнее бумаги. */
+  /* Поле снова сплошное, поэтому цвет считается для заливки: тот, что был
+     подобран под точки (светлота 69, насыщенность 80), во всю площадь читался
+     бы как плотная плашка и забивал бы светлый интерфейс. */
   function computeField(t, tension, beatDip) {
-    var sat = 80 + 40 * tension;
-    var light = 69 - 11 * tension - beatDip;
+    var sat = 52 + 28 * tension;
+    var light = 87 - 11 * tension - beatDip;
 
     for (var i = 0; i < 4; i++) {
       var p = POINTS[i];
@@ -943,15 +942,13 @@
     mg.putImageData(meshImg, 0, 0);
   }
 
-  /* Поле выводится не заливкой, а сеткой точек в один пиксель. Рисовать их
-     поштучно нельзя: при таком шаге их десятки тысяч на кадр. Поэтому поле
-     рисуется целиком в слой, а потом по нему вырезается точечная маска —
-     три полноэкранных операции вместо десятков тысяч заливок. */
+  /* Два слоя: снизу сплошное поле градиента, сверху сетка белых точек.
+     Точки в один пиксель поштучно не нарисовать — при таком шаге их десятки
+     тысяч на кадр. Но раз они одного цвета, достаточно замостить экран
+     повторяющимся узором: одна заливка вместо десятков тысяч. */
   var DOT_STEP = 5;    // шаг сетки в CSS-пикселях
   var DOT_ALPHA = 0.5; // прозрачность сетки
 
-  var layer = document.createElement('canvas');
-  var lg = layer.getContext('2d');
   var dotTile = document.createElement('canvas');
   var dotPattern = null, tileStep = 0, tileDot = 0;
 
@@ -961,9 +958,9 @@
     dotTile.height = step;
     var tg = dotTile.getContext('2d');
     tg.clearRect(0, 0, step, step);
-    tg.fillStyle = '#000';
+    tg.fillStyle = '#fff';
     tg.fillRect(0, 0, dot, dot);
-    dotPattern = lg.createPattern(dotTile, 'repeat');
+    dotPattern = g.createPattern(dotTile, 'repeat');
     tileStep = step;
     tileDot = dot;
   }
@@ -975,31 +972,18 @@
     var W = cv.width, H = cv.height;
     var dot = Math.max(1, Math.round(dpr));            // один CSS-пиксель
     var step = Math.max(dot + 1, Math.round(DOT_STEP * dpr));
-
-    if (layer.width !== W || layer.height !== H) {
-      layer.width = W;
-      layer.height = H;
-      dotPattern = null;                               // контекст слоя пересоздан
-    }
     ensureDotPattern(step, dot);
 
-    // поле целиком в слой, затем оставляем от него только точки сетки
-    lg.setTransform(1, 0, 0, 1, 0, 0);
-    lg.globalCompositeOperation = 'source-over';
-    lg.clearRect(0, 0, W, H);
-    lg.imageSmoothingEnabled = true;
-    lg.drawImage(mesh, 0, 0, W, H);
-    lg.globalCompositeOperation = 'destination-in';
-    lg.fillStyle = dotPattern;
-    lg.fillRect(0, 0, W, H);
-    lg.globalCompositeOperation = 'source-over';
-
     g.setTransform(1, 0, 0, 1, 0, 0);
-    g.fillStyle = 'hsl(' + lerp(48, 16, tension).toFixed(0) + ',' +
-      (6 + 12 * tension).toFixed(1) + '%,' + (96.6 - 2.4 * tension - beatDip).toFixed(2) + '%)';
-    g.fillRect(0, 0, W, H);
+
+    // нижний слой: градиент во всю площадь
+    g.imageSmoothingEnabled = true;
+    g.drawImage(mesh, 0, 0, W, H);
+
+    // верхний слой: сетка белых точек
     g.globalAlpha = DOT_ALPHA;
-    g.drawImage(layer, 0, 0);
+    g.fillStyle = dotPattern;
+    g.fillRect(0, 0, W, H);
     g.globalAlpha = 1;
   }
 
