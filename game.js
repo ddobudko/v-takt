@@ -83,12 +83,12 @@
 
   var INSTR = {
     kick: {
-      hue: 222, sat: 24, light: 42,
+      hue: 222, sat: 32, light: 62,
       play: function (t, i, bd) { S.kick(t, 0.85); S.kick(t + bd, 0.5); },
       accent: function (t) { S.kick(t, 0.8); }
     },
     hat: {
-      hue: 200, sat: 16, light: 54,
+      hue: 200, sat: 26, light: 66,
       play: function (t, i, bd) {
         S.hat(t + 0.5 * bd, 0.3);
         S.hat(t + 1.5 * bd, 0.22);
@@ -97,12 +97,12 @@
       accent: function (t) { S.hat(t, 0.3); }
     },
     rim: {
-      hue: 14, sat: 32, light: 55,
+      hue: 14, sat: 44, light: 66,
       play: function (t, i, bd) { S.rim(t, 0.5); S.rim(t + 1.5 * bd, 0.3); },
       accent: function (t) { S.rim(t, 0.45); }
     },
     bass: {
-      hue: 246, sat: 34, light: 47,
+      hue: 246, sat: 44, light: 63,
       seq: [[45, 50], [45, 48], [43, 50], [45, 52]],
       play: function (t, i, bd) {
         var p = this.seq[i % this.seq.length];
@@ -112,7 +112,7 @@
       accent: function (t, bd) { S.bass(t, 45, 0.5, bd); }
     },
     pluck: {
-      hue: 36, sat: 50, light: 51,
+      hue: 36, sat: 60, light: 61,
       ph: [
         [[0, 69], [1.5, 72], [2.5, 76]],
         [[0, 74], [1, 72], [2.5, 69]],
@@ -127,19 +127,19 @@
       accent: function (t) { S.pluck(t, 72, 0.3); }
     },
     bell: {
-      hue: 166, sat: 30, light: 45,
+      hue: 166, sat: 42, light: 61,
       seq: [81, 76, 79, 84],
       play: function (t, i) { S.bell(t, this.seq[i % this.seq.length], 0.22); },
       accent: function (t) { S.bell(t, 81, 0.2); }
     },
     pad: {
-      hue: 190, sat: 22, light: 51,
+      hue: 190, sat: 34, light: 64,
       ch: [[57, 60, 64], [55, 60, 64]],
       play: function (t, i, bd) { S.pad(t, this.ch[i % 2], 0.13, 8 * bd); },
       accent: function (t, bd) { S.pad(t, [57, 60, 64], 0.1, 2 * bd); }
     },
     tom: {
-      hue: 320, sat: 26, light: 48,
+      hue: 320, sat: 38, light: 63,
       play: function (t, i, bd) {
         S.tom(t, 45, 0.4);
         S.tom(t + 3.5 * bd, i % 2 ? 40 : 43, 0.28);
@@ -147,7 +147,7 @@
       accent: function (t) { S.tom(t, 45, 0.36); }
     },
     glass: {
-      hue: 100, sat: 22, light: 46,
+      hue: 100, sat: 34, light: 61,
       ph: [
         [[0, 84], [2.5, 91], [4, 88]],
         [[0, 88], [3, 93], [5.5, 84]],
@@ -946,8 +946,9 @@
      Точки в один пиксель поштучно не нарисовать — при таком шаге их десятки
      тысяч на кадр. Но раз они одного цвета, достаточно замостить экран
      повторяющимся узором: одна заливка вместо десятков тысяч. */
-  var DOT_STEP = 5;    // шаг сетки в CSS-пикселях
-  var DOT_ALPHA = 0.5; // прозрачность сетки
+  var DOT_STEP = 5;     // шаг сетки в CSS-пикселях
+  var DOT_SIZE = 1.5;   // размер точки в CSS-пикселях
+  var DOT_ALPHA = 0.72; // прозрачность сетки
 
   var dotTile = document.createElement('canvas');
   var dotPattern = null, tileStep = 0, tileDot = 0;
@@ -970,7 +971,9 @@
 
     var dpr = st.dpr;
     var W = cv.width, H = cv.height;
-    var dot = Math.max(1, Math.round(dpr));            // один CSS-пиксель
+    // размер округляем до целых устройственных пикселей: дробная точка
+    // размазалась бы сглаживанием и потускнела
+    var dot = Math.max(1, Math.round(DOT_SIZE * dpr));
     var step = Math.max(dot + 1, Math.round(DOT_STEP * dpr));
     ensureDotPattern(step, dot);
 
@@ -1096,10 +1099,12 @@
 
       // подпись сверху, ядро в центре, цена снизу: и то и другое у краёв,
       // где растущий контур ещё почти прозрачен и не спорит с текстом
+      /* Текст берёт тот же тон, но заметно темнее плитки: после осветления
+         инструментов подпись в цвет плитки на светлом фоне не читается. */
       var ink = warning
         ? 'hsla(12,48%,44%,' + (0.72 * a).toFixed(3) + ')'
         : o.alive
-          ? syncedColor(inst, 0.68 * a, -4, satScale)
+          ? syncedColor(inst, 0.82 * a, -22, satScale)
           : 'hsla(28,7%,42%,' + (0.5 * a) + ')';
 
       g.save();
@@ -1115,7 +1120,7 @@
       g.textAlign = 'right';
       g.font = '10px -apple-system, BlinkMacSystemFont, Helvetica Neue, sans-serif';
       g.fillStyle = o.alive
-        ? syncedColor(inst, 0.42 * a, 0, satScale)
+        ? syncedColor(inst, 0.5 * a, -18, satScale)
         : 'hsla(28,7%,45%,' + (0.38 * a) + ')';
       g.fillText(o.keyLabel, x + o.half - 11, y - o.half + 25);
       g.restore();
