@@ -83,12 +83,10 @@
 
   var INSTR = {
     kick: {
-      hue: 222, sat: 32, light: 62,
       play: function (t, i, bd) { S.kick(t, 0.85); S.kick(t + bd, 0.5); },
       accent: function (t) { S.kick(t, 0.8); }
     },
     hat: {
-      hue: 200, sat: 26, light: 66,
       play: function (t, i, bd) {
         S.hat(t + 0.5 * bd, 0.3);
         S.hat(t + 1.5 * bd, 0.22);
@@ -97,12 +95,10 @@
       accent: function (t) { S.hat(t, 0.3); }
     },
     rim: {
-      hue: 14, sat: 44, light: 66,
       play: function (t, i, bd) { S.rim(t, 0.5); S.rim(t + 1.5 * bd, 0.3); },
       accent: function (t) { S.rim(t, 0.45); }
     },
     bass: {
-      hue: 246, sat: 44, light: 63,
       seq: [[45, 50], [45, 48], [43, 50], [45, 52]],
       play: function (t, i, bd) {
         var p = this.seq[i % this.seq.length];
@@ -112,7 +108,6 @@
       accent: function (t, bd) { S.bass(t, 45, 0.5, bd); }
     },
     pluck: {
-      hue: 36, sat: 60, light: 61,
       ph: [
         [[0, 69], [1.5, 72], [2.5, 76]],
         [[0, 74], [1, 72], [2.5, 69]],
@@ -127,19 +122,16 @@
       accent: function (t) { S.pluck(t, 72, 0.3); }
     },
     bell: {
-      hue: 166, sat: 42, light: 61,
       seq: [81, 76, 79, 84],
       play: function (t, i) { S.bell(t, this.seq[i % this.seq.length], 0.22); },
       accent: function (t) { S.bell(t, 81, 0.2); }
     },
     pad: {
-      hue: 190, sat: 34, light: 64,
       ch: [[57, 60, 64], [55, 60, 64]],
       play: function (t, i, bd) { S.pad(t, this.ch[i % 2], 0.13, 8 * bd); },
       accent: function (t, bd) { S.pad(t, [57, 60, 64], 0.1, 2 * bd); }
     },
     tom: {
-      hue: 320, sat: 38, light: 63,
       play: function (t, i, bd) {
         S.tom(t, 45, 0.4);
         S.tom(t + 3.5 * bd, i % 2 ? 40 : 43, 0.28);
@@ -147,7 +139,6 @@
       accent: function (t) { S.tom(t, 45, 0.36); }
     },
     glass: {
-      hue: 100, sat: 34, light: 61,
       ph: [
         [[0, 84], [2.5, 91], [4, 88]],
         [[0, 88], [3, 93], [5.5, 84]],
@@ -308,17 +299,26 @@
     return o.visible && !o.alive && beat > o.graceUntil;
   }
 
-  function syncedColor(inst, alpha, lightShift, satScale) {
-    var s = inst.sat * (0.16 + 0.84 * st.sync) * (satScale === undefined ? 1 : satScale);
-    return 'hsla(' + inst.hue + ',' + s.toFixed(1) + '%,' +
-      (inst.light + (lightShift || 0)).toFixed(1) + '%,' + alpha + ')';
+  /* Инструменты белые. По мере приближения конца они краснеют вместе с
+     фоном — ведёт это то же напряжение, что красит градиент, поэтому плитки
+     и фон всегда идут в одну сторону. */
+  function tileColor(alpha, lightShift) {
+    var s = 64 * st.tension;
+    var l = 100 + (lightShift || 0) - 16 * st.tension;
+    return 'hsla(10,' + s.toFixed(1) + '%,' +
+      Math.max(0, Math.min(100, l)).toFixed(1) + '%,' + alpha + ')';
+  }
+
+  /* невзятая плитка — притушенная, но по тёмному фону всё равно светлая */
+  function dimColor(alpha) {
+    return 'hsla(10,' + (42 * st.tension).toFixed(1) + '%,' +
+      (70 - 6 * st.tension).toFixed(1) + '%,' + alpha + ')';
   }
 
   /* Очки всплывают внутри плитки, а не над ней: после уплотнения сетки
      надпись над плиткой залезала в соседний ряд. */
   function pop(o, text, good) {
-    st.pops.push({ x: o.x, y: o.y + 12, text: text, t: S.now(),
-                   hue: INSTR[o.kind].hue, good: good });
+    st.pops.push({ x: o.x, y: o.y + 12, text: text, t: S.now(), good: good });
   }
 
   /* ---------------- планировщик ---------------- */
@@ -872,9 +872,10 @@
     { fx: 0.090, fy: 0.113, px: 5.6, py: 1.1, ax: 0.47, ay: 0.40, sat: 0.62, lt: -3 }
   ];
 
-  //           серо-синий  зелёный  голубой  бирюзовый
-  var CALM = [215, 142, 196, 168];
-  var WARM = [52,   36,  60,  30];
+  /* В покое фон тёмно-серый: оттенки почти не расходятся, рисунок мэша держат
+     сдвиги светлоты `lt`. По мере приближения конца уходит в красное. */
+  var CALM = [216, 200, 232, 190];
+  var WARM = [40,   28,  48,  22];
   var HOT  = [10,    2,  18,   6];
 
   /* мягкость поля: чем меньше, тем чётче каждая точка держит свою область —
@@ -907,12 +908,12 @@
   var mpx = [0, 0, 0, 0], mpy = [0, 0, 0, 0];
   var mcr = [0, 0, 0, 0], mcg = [0, 0, 0, 0], mcb = [0, 0, 0, 0];
 
-  /* Поле снова сплошное, поэтому цвет считается для заливки: тот, что был
-     подобран под точки (светлота 69, насыщенность 80), во всю площадь читался
-     бы как плотная плашка и забивал бы светлый интерфейс. */
+  /* Тёмная схема: в покое почти чистый серый (насыщенность 7), к концу игры
+     наливается красным. Светлота держится низкой всю дорогу — плитки поверх
+     белые, и фон не должен с ними спорить. */
   function computeField(t, tension, beatDip) {
-    var sat = 52 + 28 * tension;
-    var light = 87 - 11 * tension - beatDip;
+    var sat = 7 + 46 * tension;
+    var light = 21 + 9 * tension - beatDip;
 
     for (var i = 0; i < 4; i++) {
       var p = POINTS[i];
@@ -948,7 +949,10 @@
      повторяющимся узором: одна заливка вместо десятков тысяч. */
   var DOT_STEP = 5;     // шаг сетки в CSS-пикселях
   var DOT_SIZE = 1.5;   // размер точки в CSS-пикселях
-  var DOT_ALPHA = 0.72; // прозрачность сетки
+  /* На тёмном фоне белая точка бьёт куда сильнее: при 0.72 контраст к фону
+     выходил 145 единиц против 28 на светлом, и сетка забивала текст.
+     0.2 даёт ту же читаемость фактуры, что была на светлой схеме. */
+  var DOT_ALPHA = 0.2;
 
   var dotTile = document.createElement('canvas');
   var dotPattern = null, tileStep = 0, tileDot = 0;
@@ -1004,7 +1008,6 @@
 
     st.objs.forEach(function (o) {
       if (!o.visible) return;
-      var inst = INSTR[o.kind];
       var a = Math.min(1, (t - o.appearAt) / FADE);
       var p = cyclePos(o, beat); p = p - Math.floor(p);
       var jitter = o.shake > 0 ? Math.sin(t * 90) * o.shake * 5 : 0;
@@ -1015,7 +1018,6 @@
       var lastChance = o.alive && frac <= 1 / LIFE;
       var urgency = warning ? 1 - frac / (WARN / LIFE) : 0;
       var leak = bleeding(o, beat);
-      var satScale = o.alive ? 0.75 + 0.25 * frac : 1;
 
       o.ripples.forEach(function (r) {
         var k = (t - r.t) / 1.25;
@@ -1023,7 +1025,7 @@
         // волна доходит ровно до индикатора и там гаснет: дальше уже зона соседа
         var s = o.size + k * 2 * GAP * r.s;
         tilePath(x, y, s, o.radius * (s / o.size));
-        g.strokeStyle = syncedColor(inst, (1 - k) * 0.28 * r.s * a, 0, satScale);
+        g.strokeStyle = tileColor((1 - k) * 0.3 * r.s * a);
         g.lineWidth = 1.4 * (1 - k);
         g.stroke();
       });
@@ -1035,10 +1037,10 @@
       var antic = Math.pow(p, 10);
       tilePath(x, y, Math.max(o.size * k2, 1), o.radius * k2);
       g.strokeStyle = lastChance
-        ? 'hsla(12,58%,50%,' + ((0.3 + 0.65 * ringA) * a) + ')'   // «сюда, сейчас»
+        ? 'hsla(10,74%,62%,' + ((0.34 + 0.62 * ringA) * a) + ')'   // «сюда, сейчас»
         : o.alive
-          ? syncedColor(inst, (0.18 + 0.72 * ringA) * a, 0, satScale)
-          : 'hsla(28,7%,38%,' + ((0.14 + 0.56 * ringA) * a) + ')';
+          ? tileColor((0.2 + 0.7 * ringA) * a)
+          : dimColor((0.16 + 0.5 * ringA) * a);
       g.lineWidth = (1.2 + land * 2) * (warning ? 1.6 : 1);
       g.stroke();
 
@@ -1050,7 +1052,7 @@
       if (leak) {
         // молчащая плитка не уходит, а тянет очки — и видно, что она тянет
         tilePath(x, y, o.size + 2 * GAP, o.radius + GAP);
-        g.strokeStyle = 'hsla(12,45%,52%,' + ((0.14 + 0.34 * o.bleed) * a).toFixed(3) + ')';
+        g.strokeStyle = 'hsla(10,64%,58%,' + ((0.18 + 0.38 * o.bleed) * a).toFixed(3) + ')';
         g.lineWidth = 1.2 + o.bleed * 1.8;
         g.stroke();
       }
@@ -1060,21 +1062,21 @@
       if (o.alive) {
         // в тревоге плитка вспыхивает внутрь — сигнал, не выходящий за рамку
         g.fillStyle = warning
-          ? 'hsla(12,45%,55%,' + ((0.08 + 0.16 * o.warnFlash) * a).toFixed(3) + ')'
-          : syncedColor(inst, (0.09 + o.flash * 0.15) * a, 0, satScale);
+          ? 'hsla(10,62%,56%,' + ((0.12 + 0.2 * o.warnFlash) * a).toFixed(3) + ')'
+          : tileColor((0.1 + o.flash * 0.16) * a);
         g.fill();
         g.strokeStyle = warning
-          ? 'hsla(12,50%,48%,' + ((0.45 + 0.35 * urgency + o.flash * 0.3) * a).toFixed(3) + ')'
-          : syncedColor(inst, (0.6 + antic * 0.2 + o.flash * 0.4) * a, -o.flash * 6, satScale);
+          ? 'hsla(10,70%,60%,' + ((0.55 + 0.3 * urgency + o.flash * 0.3) * a).toFixed(3) + ')'
+          : tileColor((0.62 + antic * 0.2 + o.flash * 0.38) * a);
         g.lineWidth = 1.6 + o.flash * 1.6 + urgency * 1.2;
       } else {
         g.fillStyle = leak
-          ? 'hsla(12,30%,60%,' + (0.07 * a) + ')'
-          : 'hsla(28,7%,50%,' + (0.03 * a) + ')';
+          ? 'hsla(10,55%,58%,' + (0.1 * a) + ')'
+          : dimColor(0.05 * a);
         g.fill();
         g.strokeStyle = leak
-          ? 'hsla(12,45%,48%,' + ((0.4 + 0.25 * o.bleed) * a).toFixed(3) + ')'
-          : 'hsla(28,7%,40%,' + ((0.42 + antic * 0.25) * a) + ')';
+          ? 'hsla(10,64%,58%,' + ((0.5 + 0.25 * o.bleed) * a).toFixed(3) + ')'
+          : dimColor((0.46 + antic * 0.25) * a);
         g.lineWidth = 1.4;
       }
       g.stroke();
@@ -1090,8 +1092,8 @@
         g.setLineDash([shown * per, per]);
         tilePath(x, y, gs, gr);
         g.strokeStyle = warning
-          ? 'hsla(12,58%,50%,' + ((0.55 + 0.4 * o.warnFlash) * a).toFixed(3) + ')'
-          : syncedColor(inst, 0.5 * a, 0, satScale);
+          ? 'hsla(10,72%,62%,' + ((0.6 + 0.35 * o.warnFlash) * a).toFixed(3) + ')'
+          : tileColor(0.55 * a);
         g.lineWidth = warning ? 2.8 + o.warnFlash * 1.8 + urgency * 1.4 : 2;
         g.stroke();
         g.restore();
@@ -1102,10 +1104,8 @@
       /* Текст берёт тот же тон, но заметно темнее плитки: после осветления
          инструментов подпись в цвет плитки на светлом фоне не читается. */
       var ink = warning
-        ? 'hsla(12,48%,44%,' + (0.72 * a).toFixed(3) + ')'
-        : o.alive
-          ? syncedColor(inst, 0.82 * a, -22, satScale)
-          : 'hsla(28,7%,42%,' + (0.5 * a) + ')';
+        ? 'hsla(10,74%,66%,' + (0.9 * a).toFixed(3) + ')'
+        : o.alive ? tileColor(0.92 * a, -5) : dimColor(0.65 * a);
 
       g.save();
       g.textAlign = 'center';
@@ -1119,17 +1119,13 @@
       g.save();
       g.textAlign = 'right';
       g.font = '10px -apple-system, BlinkMacSystemFont, Helvetica Neue, sans-serif';
-      g.fillStyle = o.alive
-        ? syncedColor(inst, 0.5 * a, -18, satScale)
-        : 'hsla(28,7%,45%,' + (0.38 * a) + ')';
+      g.fillStyle = o.alive ? tileColor(0.55 * a, -8) : dimColor(0.42 * a);
       g.fillText(o.keyLabel, x + o.half - 11, y - o.half + 25);
       g.restore();
 
       g.beginPath();
       g.arc(x, y, o.alive ? 2.8 + o.flash * 2.6 : 2.2, 0, Math.PI * 2);
-      g.fillStyle = o.alive
-        ? syncedColor(inst, 0.85 * a, 0, satScale)
-        : 'hsla(28,7%,40%,' + (0.5 * a) + ')';
+      g.fillStyle = o.alive ? tileColor(0.92 * a) : dimColor(0.55 * a);
       g.fill();
 
       g.font = '12px -apple-system, BlinkMacSystemFont, Helvetica Neue, sans-serif';
@@ -1143,8 +1139,8 @@
     st.pops.forEach(function (q) {
       var k = (t - q.t) / 0.95;
       g.fillStyle = q.good
-        ? 'hsla(' + q.hue + ',38%,42%,' + (1 - k) + ')'
-        : 'hsla(12,55%,45%,' + (1 - k) + ')';
+        ? tileColor(1 - k, -4)
+        : 'hsla(10,74%,64%,' + (1 - k) + ')';
       g.fillText(q.text, q.x, q.y - k * 24);
     });
   }

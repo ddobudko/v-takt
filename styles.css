@@ -1,6 +1,6 @@
 :root {
-  --ink: #6f6d66;
-  --ink-soft: #a3a099;
+  --ink: #b3afa7;
+  --ink-soft: #97938b;
 }
 
 * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -12,7 +12,7 @@ html, body {
   width: 100%;
   height: 100%;
   overflow: hidden;
-  background: #f6f5f2;
+  background: #1b1b1e;
 }
 
 body {
@@ -56,7 +56,7 @@ body {
 }
 
 /* фон теперь цветной и подвижный — подписи считаются от него, а не от бумаги */
-.hud-cap { color: #7d7a72; }
+.hud-cap { color: #a5a199; }
 
 /* на титуле игрового HUD быть не должно: раньше его прятала пелена,
    теперь экран прозрачный и сетка видна насквозь */
@@ -66,21 +66,21 @@ body.on-title .hud { opacity: 0; }
   font-size: 20px;
   font-weight: 300;
   letter-spacing: 0.08em;
-  color: #4e4c46;
+  color: #ddd9d2;
   font-variant-numeric: tabular-nums;
 }
 
 .hud-best-num {
   font-size: 12px;
   letter-spacing: 0.1em;
-  color: #6f6c65;
+  color: #b3afa7;
   font-variant-numeric: tabular-nums;
 }
 
 /* момент, когда текущий заход обошёл собственный рекорд */
 .hud-best.beaten .hud-cap,
 .hud-best.beaten .hud-best-num {
-  color: #b4573c;
+  color: #e0715a;
 }
 .hud-best.just-beaten { animation: lift 0.9s cubic-bezier(.2, 1.4, .4, 1); }
 
@@ -114,7 +114,7 @@ body.on-title .hud { opacity: 0; }
   align-items: center;
   justify-content: center;
   gap: 22px;
-  background: rgba(246, 245, 242, 0.86);   /* мэш просвечивает сквозь пелену */
+  background: rgba(20, 19, 23, 0.86);   /* мэш просвечивает сквозь пелену */
   pointer-events: auto;
   animation: veil 0.35s ease;
 }
@@ -122,14 +122,14 @@ body.on-title .hud { opacity: 0; }
 .over-line {
   font-size: 14px;
   letter-spacing: 0.06em;
-  color: #16150f;
+  color: #edeae4;
 }
 
 .over-score {
   font-size: 22px;
   font-weight: 300;
   letter-spacing: 0.1em;
-  color: #4e4c46;
+  color: #ddd9d2;
   font-variant-numeric: tabular-nums;
 }
 .over-score span { font-size: 26px; }
@@ -137,7 +137,7 @@ body.on-title .hud { opacity: 0; }
 .over-best {
   font-size: 12px;
   letter-spacing: 0.14em;
-  color: #a3a099;
+  color: #97938b;
   font-variant-numeric: tabular-nums;
 }
 
@@ -152,7 +152,7 @@ body.on-title .hud { opacity: 0; }
   font-size: 26px;
   font-weight: 300;
   letter-spacing: 0.44em;
-  color: #4e4c46;
+  color: #ddd9d2;
   padding-left: 0.44em;
 }
 
@@ -167,12 +167,12 @@ body.on-title .hud { opacity: 0; }
   font: inherit;
   font-size: 11px;
   letter-spacing: 0.24em;
-  color: #8d8a82;
+  color: #a49f97;
   cursor: pointer;
   padding: 6px 0;
   transition: color 0.3s ease;
 }
-.pause-btn:hover { color: #16150f; }
+.pause-btn:hover { color: #edeae4; }
 
 /* --- настройки --- */
 
@@ -195,7 +195,7 @@ body.on-title .hud { opacity: 0; }
 .set-cap, .set-btn {
   font-size: 10px;
   letter-spacing: 0.2em;
-  color: #8d8a82;
+  color: #a49f97;
   border: none;
   background: transparent;
   font-family: inherit;
@@ -203,7 +203,7 @@ body.on-title .hud { opacity: 0; }
   transition: color 0.3s ease;
 }
 .set-btn { cursor: pointer; }
-.set-btn:hover, .set-row:hover .set-cap { color: #16150f; }
+.set-btn:hover, .set-row:hover .set-cap { color: #edeae4; }
 
 .vol {
   -webkit-appearance: none;
@@ -215,7 +215,7 @@ body.on-title .hud { opacity: 0; }
 }
 .vol::-webkit-slider-runnable-track {
   height: 1px;
-  background: #c4c1b9;
+  background: #43414a;
 }
 .vol::-webkit-slider-thumb {
   -webkit-appearance: none;
@@ -223,12 +223,12 @@ body.on-title .hud { opacity: 0; }
   height: 9px;
   margin-top: -4px;
   border-radius: 50%;
-  background: #6f6c65;
+  background: #b3afa7;
   border: none;
 }
-.vol::-moz-range-track { height: 1px; background: #c4c1b9; }
+.vol::-moz-range-track { height: 1px; background: #43414a; }
 .vol::-moz-range-thumb {
-  width: 9px; height: 9px; border: none; border-radius: 50%; background: #6f6c65;
+  width: 9px; height: 9px; border: none; border-radius: 50%; background: #b3afa7;
 }
 
 .title-screen {
@@ -252,7 +252,7 @@ body.on-title .hud { opacity: 0; }
   font-size: 46px;
   font-weight: 300;
   letter-spacing: 0.34em;
-  color: #4e4c46;
+  color: #ddd9d2;
   padding-left: 0.34em;
 }
 
@@ -260,7 +260,7 @@ body.on-title .hud { opacity: 0; }
   font-size: 13px;
   line-height: 2;
   letter-spacing: 0.06em;
-  color: #16150f;
+  color: #edeae4;
   text-align: center;
   /* строки разбиты вручную через <br>: контейнер должен вмещать самую длинную,
      иначе последнее слово срывается на отдельную строку */
@@ -272,7 +272,7 @@ body.on-title .hud { opacity: 0; }
   margin-top: 26px;
   font-size: 11px;
   letter-spacing: 0.24em;
-  color: #b8b5ad;
+  color: #8e8a82;
   animation: breathe 3.4s ease-in-out infinite;
 }
 
@@ -290,18 +290,18 @@ body.on-title .hud { opacity: 0; }
   width: 240px;
   padding: 6px 2px;
   border: none;
-  border-bottom: 1px solid #cfccc4;
+  border-bottom: 1px solid #43414a;
   background: transparent;
   font: inherit;
   font-size: 14px;
   letter-spacing: 0.08em;
-  color: #16150f;
+  color: #edeae4;
   text-align: center;
   outline: none;
   transition: border-color 0.3s ease;
 }
-.name-input::placeholder { color: #c2bfb7; letter-spacing: 0.12em; }
-.name-input:focus { border-bottom-color: #8d8a82; }
+.name-input::placeholder { color: #847f78; letter-spacing: 0.12em; }
+.name-input:focus { border-bottom-color: #a49f97; }
 .name-input.nudge { animation: nudge 0.4s ease; }
 
 @keyframes nudge {
@@ -316,20 +316,20 @@ body.on-title .hud { opacity: 0; }
   font: inherit;
   font-size: 11px;
   letter-spacing: 0.24em;
-  color: #8d8a82;
+  color: #a49f97;
   cursor: pointer;
   padding: 4px 0;
   pointer-events: auto;
   transition: color 0.3s ease;
 }
-.name-go:hover, .link-btn:hover { color: #16150f; }
+.name-go:hover, .link-btn:hover { color: #edeae4; }
 
 .link-btn {
   position: absolute;
   bottom: 48px;
   font-size: 10px;
   letter-spacing: 0.2em;
-  color: #c2bfb7;
+  color: #847f78;
 }
 
 .welcome {
@@ -343,13 +343,13 @@ body.on-title .hud { opacity: 0; }
 .welcome-line {
   font-size: 15px;
   letter-spacing: 0.06em;
-  color: #16150f;
+  color: #edeae4;
 }
 
 .welcome-best {
   font-size: 12px;
   letter-spacing: 0.14em;
-  color: #a3a099;
+  color: #97938b;
   font-variant-numeric: tabular-nums;
 }
 
