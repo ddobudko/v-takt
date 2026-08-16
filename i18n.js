@@ -38,6 +38,7 @@
       'set.fullscreen': 'во весь экран',
       'set.lang': 'english',
 
+      'hint.audio': 'звук заблокирован браузером — щёлкните по экрану ещё раз',
       'hint.aim': 'кликните по плитке, когда контур коснётся её края',
       'hint.hold': 'держите инструмент живым — подтверждайте попадание, пока дуга не опустела',
       'hint.keep': 'прежние не бросайте: молчащая плитка тянет счёт вниз каждую долю',
@@ -85,6 +86,7 @@
       'set.fullscreen': 'fullscreen',
       'set.lang': 'русский',
 
+      'hint.audio': 'the browser blocked audio — click the screen once more',
       'hint.aim': 'click a tile when its contour reaches the edge',
       'hint.hold': 'keep the instrument alive — land a hit before the arc runs out',
       'hint.keep': "don't abandon the earlier ones: a silent tile drains your score every beat",

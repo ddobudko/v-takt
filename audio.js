@@ -386,6 +386,24 @@
     BPM: BPM,
     init: init,
     resume: function () { if (ctx && ctx.state !== 'running') ctx.resume(); },
+
+    /* Разблокировка звука первым же жестом пользователя.
+       Safari не считает контекст «разбуженным», пока в пределах жеста реально
+       не прозвучал хотя бы один источник, — одного resume() ему мало. Поэтому
+       заводим контекст и тут же проигрываем односэмпловую тишину.
+       Вызывать строго синхронно из обработчика жеста: любой await съедает
+       пользовательскую активацию. */
+    unlock: function () {
+      init();
+      if (!ctx) return;
+      try {
+        var b = ctx.createBufferSource();
+        b.buffer = ctx.createBuffer(1, 1, ctx.sampleRate);
+        b.connect(ctx.destination);
+        b.start(0);
+      } catch (e) {}
+      if (ctx.state !== 'running') ctx.resume();
+    },
     /* Громкость — множитель поверх сведения, поэтому баланс инструментов
        между собой не меняется. Плавно, чтобы не щёлкало. */
     setVolume: function (v) {

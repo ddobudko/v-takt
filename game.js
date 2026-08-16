@@ -697,6 +697,18 @@
     if (document.hidden) { saveNow(); setPaused(true); }   // ушли со вкладки — не теряем состав
   });
 
+  /* Звук будим самым первым жестом, каким бы он ни был, — не дожидаясь начала
+     игры. Safari выдаёт пользовательскую активацию ровно один раз на жест, и
+     если потратить её на что-то другое, контекст останется немым. */
+  (function wakeAudio() {
+    var events = ['pointerdown', 'mousedown', 'touchend', 'keydown'];
+    function wake() {
+      S.unlock();
+      events.forEach(function (n) { document.removeEventListener(n, wake, true); });
+    }
+    events.forEach(function (n) { document.addEventListener(n, wake, true); });
+  })();
+
   I18N.apply();
   initTitle();
 
@@ -1159,9 +1171,25 @@
                   mesh: mesh, meshImg: meshImg, computeField: computeField,
                   drawMeshDots: drawMeshDots };
 
-  var last = 0;
+  var last = 0, lastWake = 0, wakeTries = 0;
   function frame() {
     requestAnimationFrame(frame);
+
+    /* Safari умеет уводить контекст в 'interrupted' — например, когда звук
+       забирает другое приложение. Сам он оттуда не возвращается, и игра
+       остаётся немой при живой картинке. Тихо будим раз в секунду. */
+    if (st.mode === 'play' && !st.paused && S.ready() && S.state() !== 'running') {
+      var nowMs = performance.now();
+      if (nowMs - lastWake > 1000) {
+        lastWake = nowMs;
+        S.resume();
+        // разбудить не вышло — говорим об этом, а не молчим загадочно
+        if (++wakeTries > 2 && st.hinted < 3) { st.hinted = 3; showHint(tr('hint.audio')); }
+      }
+    } else if (S.ready() && S.state() === 'running') {
+      wakeTries = 0;
+    }
+
     if (S.ready()) st.perfToCtx = S.ctxNow() - performance.now() / 1000;
     // до включения звука фон всё равно должен жить — берём часы страницы
     var t = S.ready() ? S.now() : performance.now() / 1000;
