@@ -332,6 +332,13 @@
       var bt = timeAt(st.cursor);
       var bd = beatDur();
       if (bt > S.ctxNow() + 0.005) {
+        // пока не взят ни один инструмент, долю держит метроном
+        var anyAlive = false;
+        for (var q = 0; q < st.objs.length; q++) {
+          if (st.objs[q].alive) { anyAlive = true; break; }
+        }
+        if (!anyAlive) S.metro(bt, st.cursor % BEATS_PER_BAR === 0 ? 0.18 : 0.1);
+
         st.objs.forEach(function (o) {
           if (!o.alive) return;
           var rel = st.cursor - o.offset;

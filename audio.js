@@ -332,16 +332,32 @@
     o.start(t); o.stop(t + 0.45);
   }
 
+  /* Промах должен быть слышен: на прежнем уровне он выходил −44 dBFS, то есть
+     полтишины, и клик мимо казался «звук не работает». */
   function thud(t) {
     var s = noise();
     var f = ctx.createBiquadFilter();
     f.type = 'lowpass';
-    f.frequency.value = 380;
+    f.frequency.value = 700;
     var g = ctx.createGain();
-    env(g, t, 0.09, 0.004, 0.16);
+    env(g, t, 0.42, 0.004, 0.18);
     s.connect(f); f.connect(g);
     g.connect(bus(0.5, 0.1));
-    s.start(t); s.stop(t + 0.2);
+    s.start(t); s.stop(t + 0.22);
+  }
+
+  /* Метроном звучит, пока не взят ни один инструмент. Без него игра до
+     первого попадания совершенно нема — и не даёт доли, к которой целиться. */
+  function metro(t, v) {
+    var o = ctx.createOscillator();
+    o.type = 'sine';
+    o.frequency.value = 1180;
+    var g = ctx.createGain();
+    env(g, t, v, 0.002, 0.035);
+    o.connect(g);
+    g.connect(bus(0.45, 0.3));
+    o.start(t);
+    o.stop(t + 0.06);
   }
 
   // инструмент угас без подтверждения — тихий нисходящий вздох, не упрёк
@@ -351,7 +367,7 @@
       o.type = 'sine';
       o.frequency.value = midi(n[1]);
       var g = ctx.createGain();
-      env(g, t + n[0], 0.05, 0.012, 0.55);
+      env(g, t + n[0], 0.085, 0.012, 0.55);
       o.connect(g);
       g.connect(bus(0.4, 0.55));
       o.start(t + n[0]);
@@ -388,6 +404,7 @@
     kick: kick, hat: hat, rim: rim, bass: bass,
     pluck: pluck, bell: bell, pad: pad, tom: tom, glass: glass,
     confirm: confirm_, tick: tick, thud: thud, chord: chord, expire: expire,
+    metro: metro,
     // точка съёма для замеров уровня и спектра при настройке
     graph: function () { return { ctx: ctx, master: master, out: outNode }; }
   };
