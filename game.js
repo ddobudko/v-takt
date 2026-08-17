@@ -1178,15 +1178,21 @@
     /* Safari умеет уводить контекст в 'interrupted' — например, когда звук
        забирает другое приложение. Сам он оттуда не возвращается, и игра
        остаётся немой при живой картинке. Тихо будим раз в секунду. */
-    if (st.mode === 'play' && !st.paused && S.ready() && S.state() !== 'running') {
+    /* Условия на S.ready() здесь быть не должно: если сборка графа упала,
+       ready как раз false — то есть в главном случае сторож бы и не сработал.
+       unlock() пробует собрать заново и снова разбудить. */
+    if (st.mode === 'play' && !st.paused && S.state() !== 'running') {
       var nowMs = performance.now();
       if (nowMs - lastWake > 1000) {
         lastWake = nowMs;
-        S.resume();
+        S.unlock();
         // разбудить не вышло — говорим об этом, а не молчим загадочно
-        if (++wakeTries > 2 && st.hinted < 3) { st.hinted = 3; showHint(tr('hint.audio')); }
+        if (++wakeTries > 2 && st.hinted < 3) {
+          st.hinted = 3;
+          showHint(S.error() ? tr('hint.audio') + ' · ' + S.error() : tr('hint.audio'));
+        }
       }
-    } else if (S.ready() && S.state() === 'running') {
+    } else if (S.state() === 'running') {
       wakeTries = 0;
     }
 

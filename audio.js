@@ -13,6 +13,7 @@
 
   var ctx = null, master = null, outNode = null, revSend = null, noiseBuf = null;
   var volume = 1;              // множитель громкости поверх сведения
+  var initError = null;
   var lat = 0;
   var ready = false;
 
@@ -32,9 +33,21 @@
     return c;
   }
 
+  /* Сборка графа обёрнута в try: если она падает (а в Safari падать есть чему),
+     раньше это проходило бесследно — ready оставался false, планировщик молча
+     выходил, а игра продолжала идти на запасных часах страницы и выглядела
+     совершенно рабочей. Теперь ошибка сохраняется и её видно. */
   function init() {
     if (ready) return;
+    try { build(); } catch (e) {
+      initError = (e && e.name ? e.name + ': ' : '') + (e && e.message ? e.message : String(e));
+      ready = false;
+    }
+  }
+
+  function build() {
     var AC = global.AudioContext || global.webkitAudioContext;
+    if (!AC) throw new Error('AudioContext не поддерживается');
     ctx = new AC();
 
     master = ctx.createGain();
@@ -416,6 +429,7 @@
     suspend: function () { if (ctx && ctx.state === 'running') ctx.suspend(); },
     state: function () { return ctx ? ctx.state : 'none'; },
     ready: function () { return ready; },
+    error: function () { return initError; },
     ctxNow: function () { return ctx ? ctx.currentTime : 0; },
     now: function () { return ctx ? ctx.currentTime - lat : 0; },
     latency: function () { return lat; },

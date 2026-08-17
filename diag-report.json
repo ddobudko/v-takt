@@ -1,0 +1,18 @@
+{
+  "браузер": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) V",
+  "адрес": "http://localhost:8124/safari-diag.html",
+  "AudioContext есть": true,
+  "webkitAudioContext есть": false,
+  "контекст создан": "да",
+  "состояние сразу": "suspended",
+  "частота дискретизации": 48000,
+  "baseLatency": 0.0026666666666666666,
+  "outputLatency": 0,
+  "каналов у выхода": 2,
+  "тишина проиграна": "да",
+  "состояние после resume": "running",
+  "часы шли": "1.011 с",
+  "пик сигнала": "-8.0 dBFS",
+  "состояние в конце": "running",
+  "слышали ли вы тон": "ответьте словами"
+}

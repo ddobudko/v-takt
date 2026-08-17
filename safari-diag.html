@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>втакт — диагностика звука</title>
+<style>
+  body { font: 15px/1.6 -apple-system, sans-serif; background: #16161a; color: #e8e6e0;
+         margin: 0; padding: 28px 32px; }
+  h1 { font-size: 17px; font-weight: 500; letter-spacing: .04em; margin: 0 0 4px; }
+  p.sub { color: #96938c; margin: 0 0 20px; font-size: 13px; }
+  #tap { display: block; width: 100%; padding: 22px; margin: 0 0 22px;
+         background: #2a2a31; color: #e8e6e0; border: 1px solid #45444d;
+         border-radius: 10px; font: inherit; font-size: 16px; cursor: pointer; }
+  #tap:active { background: #34343c; }
+  table { border-collapse: collapse; width: 100%; font-size: 13px; }
+  td { padding: 5px 10px 5px 0; border-bottom: 1px solid #2b2b31; vertical-align: top; }
+  td.k { color: #96938c; white-space: nowrap; width: 42%; }
+  .ok { color: #7ec98f; }
+  .bad { color: #e0715a; }
+  pre { background: #202027; padding: 12px; border-radius: 8px; overflow-x: auto;
+        font-size: 11px; color: #b9b6ae; }
+</style>
+</head>
+<body>
+  <h1>втакт — диагностика звука</h1>
+  <p class="sub">нажмите кнопку, потом пришлите снимок этого экрана</p>
+  <button id="tap">нажмите сюда, чтобы проверить звук</button>
+  <table id="out"></table>
+  <pre id="raw"></pre>
+
+<script>
+(function () {
+  'use strict';
+  var R = {};
+  var out = document.getElementById('out');
+
+  function set(k, v, good) {
+    R[k] = v;
+    var tr = document.createElement('tr');
+    var a = document.createElement('td'); a.className = 'k'; a.textContent = k;
+    var b = document.createElement('td');
+    b.textContent = String(v);
+    if (good === true) b.className = 'ok';
+    if (good === false) b.className = 'bad';
+    tr.appendChild(a); tr.appendChild(b); out.appendChild(tr);
+  }
+
+  set('браузер', navigator.userAgent.slice(0, 90));
+  set('адрес', location.href);
+
+  var AC = window.AudioContext || window.webkitAudioContext;
+  set('AudioContext есть', !!window.AudioContext, !!window.AudioContext);
+  set('webkitAudioContext есть', !!window.webkitAudioContext);
+
+  var errs = [];
+  window.addEventListener('error', function (e) {
+    errs.push((e.message || '') + ' @ ' + (e.filename || '').split('/').pop() + ':' + e.lineno);
+    set('ошибка страницы', errs[errs.length - 1], false);
+  });
+
+  document.getElementById('tap').addEventListener('click', function () {
+    var ctx = null;
+    try {
+      ctx = new AC();
+    } catch (e) {
+      set('создание контекста', 'ИСКЛЮЧЕНИЕ: ' + e.message, false);
+      send();
+      return;
+    }
+    set('контекст создан', 'да', true);
+    set('состояние сразу', ctx.state, ctx.state === 'running');
+    set('частота дискретизации', ctx.sampleRate);
+    set('baseLatency', typeof ctx.baseLatency === 'undefined' ? 'нет свойства' : ctx.baseLatency);
+    set('outputLatency', typeof ctx.outputLatency === 'undefined' ? 'нет свойства' : ctx.outputLatency);
+    set('каналов у выхода', ctx.destination.maxChannelCount);
+
+    // односэмпловая тишина — канонический приём разбудить Safari
+    try {
+      var b = ctx.createBufferSource();
+      b.buffer = ctx.createBuffer(1, 1, ctx.sampleRate);
+      b.connect(ctx.destination);
+      b.start(0);
+      set('тишина проиграна', 'да', true);
+    } catch (e) {
+      set('тишина проиграна', 'ИСКЛЮЧЕНИЕ: ' + e.message, false);
+    }
+
+    ctx.resume().then(function () {
+      set('состояние после resume', ctx.state, ctx.state === 'running');
+      measure(ctx);
+    }, function (e) {
+      set('resume отклонён', e.message, false);
+      measure(ctx);
+    });
+  });
+
+  function measure(ctx) {
+    // слышимый тон + замер уровня на выходе
+    var an, td;
+    try {
+      an = ctx.createAnalyser();
+      an.fftSize = 2048;
+      td = new Float32Array(an.fftSize);
+    } catch (e) {
+      set('анализатор', 'ИСКЛЮЧЕНИЕ: ' + e.message, false);
+      send();
+      return;
+    }
+    var g = ctx.createGain();
+    g.gain.value = 0.0001;
+    g.gain.exponentialRampToValueAtTime(0.4, ctx.currentTime + 0.01);
+    g.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.9);
+    var o = ctx.createOscillator();
+    o.type = 'sine';
+    o.frequency.value = 440;
+    o.connect(g);
+    g.connect(an);
+    g.connect(ctx.destination);
+    o.start();
+    o.stop(ctx.currentTime + 1);
+
+    var t0 = ctx.currentTime, peak = 0, n = 0;
+    var iv = setInterval(function () {
+      an.getFloatTimeDomainData(td);
+      for (var i = 0; i < td.length; i++) peak = Math.max(peak, Math.abs(td[i]));
+      if (++n > 60) {
+        clearInterval(iv);
+        set('часы шли', (ctx.currentTime - t0).toFixed(3) + ' с',
+            ctx.currentTime - t0 > 0.3);
+        set('пик сигнала', peak > 0 ? (20 * Math.log10(peak)).toFixed(1) + ' dBFS' : 'НОЛЬ',
+            peak > 0.01);
+        set('состояние в конце', ctx.state, ctx.state === 'running');
+        set('слышали ли вы тон', 'ответьте словами');
+        send();
+      }
+    }, 16);
+  }
+
+  function send() {
+    document.getElementById('raw').textContent = JSON.stringify(R, null, 1);
+    try {
+      var img = new Image();
+      img.src = '/report?d=' + encodeURIComponent(JSON.stringify(R)) + '&_=' + Date.now();
+    } catch (e) {}
+  }
+})();
+</script>
+</body>
+</html>
