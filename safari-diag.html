@@ -25,7 +25,8 @@
 <body>
   <h1>втакт — диагностика звука</h1>
   <p class="sub">нажмите кнопку, потом пришлите снимок этого экрана</p>
-  <button id="tap">нажмите сюда, чтобы проверить звук</button>
+  <button id="tap">1 — проверить WebAudio (тон 440 Гц)</button>
+  <button id="tap2">2 — проверить обычный звуковой файл</button>
   <table id="out"></table>
   <pre id="raw"></pre>
 
@@ -136,6 +137,71 @@
       }
     }, 16);
   }
+
+  /* Второй тест — обычный <audio> с сгенерированным WAV.
+     Он делит проблему надвое: если и его не слышно, звук глушится вне
+     страницы (вкладка, устройство вывода, системный микшер); если слышно —
+     дело именно в WebAudio, и копать надо там. */
+  function makeWav(freq, seconds, rate) {
+    rate = rate || 44100;
+    var n = Math.floor(rate * seconds);
+    var buf = new ArrayBuffer(44 + n * 2);
+    var v = new DataView(buf);
+    function str(off, s) {
+      for (var i = 0; i < s.length; i++) v.setUint8(off + i, s.charCodeAt(i));
+    }
+    str(0, 'RIFF'); v.setUint32(4, 36 + n * 2, true); str(8, 'WAVEfmt ');
+    v.setUint32(16, 16, true); v.setUint16(20, 1, true); v.setUint16(22, 1, true);
+    v.setUint32(24, rate, true); v.setUint32(28, rate * 2, true);
+    v.setUint16(32, 2, true); v.setUint16(34, 16, true);
+    str(36, 'data'); v.setUint32(40, n * 2, true);
+    for (var i = 0; i < n; i++) {
+      var env = Math.min(1, i / (rate * 0.01)) * Math.min(1, (n - i) / (rate * 0.05));
+      v.setInt16(44 + i * 2,
+        Math.round(Math.sin(2 * Math.PI * freq * i / rate) * 0.45 * env * 32767), true);
+    }
+    var bytes = new Uint8Array(buf), bin = '';
+    for (var j = 0; j < bytes.length; j++) bin += String.fromCharCode(bytes[j]);
+    return 'data:audio/wav;base64,' + btoa(bin);
+  }
+
+  document.getElementById('tap2').addEventListener('click', function () {
+    var a;
+    try {
+      a = new Audio(makeWav(440, 0.9));
+    } catch (e) {
+      set('файл: создание', 'ИСКЛЮЧЕНИЕ: ' + e.message, false);
+      send();
+      return;
+    }
+    a.volume = 1;
+    set('файл: громкость элемента', a.volume, a.volume > 0);
+    set('файл: muted', a.muted, a.muted === false);
+    var p = a.play();
+    if (p && p.then) {
+      p.then(function () {
+        set('файл: play()', 'разрешён', true);
+        setTimeout(function () {
+          set('файл: проигралось секунд', a.currentTime.toFixed(2), a.currentTime > 0.2);
+          if (navigator.mediaDevices && navigator.mediaDevices.enumerateDevices) {
+            navigator.mediaDevices.enumerateDevices().then(function (ds) {
+              var outs = ds.filter(function (d) { return d.kind === 'audiooutput'; });
+              set('устройств вывода', outs.length);
+              set('названия устройств',
+                  outs.map(function (d) { return d.label || '(без доступа)'; }).join(' | '));
+              send();
+            }, function () { send(); });
+          } else { send(); }
+        }, 1100);
+      }, function (e) {
+        set('файл: play() отклонён', e.name + ': ' + e.message, false);
+        send();
+      });
+    } else {
+      set('файл: play()', 'без промиса (старый Safari)');
+      send();
+    }
+  });
 
   function send() {
     document.getElementById('raw').textContent = JSON.stringify(R, null, 1);
