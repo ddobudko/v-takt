@@ -47,7 +47,6 @@ body {
 .hud-score { top: 28px; left: 32px; }
 .hud-best  { top: 60px; left: 32px; }
 .hud-tempo { top: 28px; right: 32px; }
-.hud-keys  { bottom: 26px; right: 32px; opacity: 0.5; }
 
 .hud-score, .hud-tempo, .hud-best {
   display: flex;
@@ -176,14 +175,28 @@ body.on-title .hud { opacity: 0; }
 
 /* --- настройки --- */
 
+.settings-block {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 13px;
+  pointer-events: auto;
+}
+
 .settings {
   display: flex;
   align-items: center;
   gap: 28px;
-  pointer-events: auto;
 }
 
 .title-settings { margin-top: 30px; }
+
+/* подсказка по клавишам живёт под настройками и в их же цвете */
+.set-keys {
+  font-size: 10px;
+  letter-spacing: 0.2em;
+  color: #a49f97;
+}
 
 .set-row {
   display: flex;

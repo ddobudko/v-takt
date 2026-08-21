@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>втакт</title>
-<link rel="stylesheet" href="styles.css?v=39">
+<link rel="stylesheet" href="styles.css?v=40">
 </head>
 <body>
   <canvas id="stage"></canvas>
@@ -19,7 +19,6 @@
     <div class="hud hud-tempo">
       <span id="hud-tempo" class="hud-num">84</span><span class="hud-cap" data-i18n="hud.bpm">уд/мин</span>
     </div>
-    <div id="hud-keys" class="hud hud-keys" data-i18n="hud.keys"></div>
     <div id="hint" class="hint"></div>
 
     <div id="over" class="pause-screen" hidden>
@@ -35,12 +34,15 @@
 
     <div id="pause" class="pause-screen" hidden>
       <div class="pause-word" data-i18n="pause.word">пауза</div>
-      <div class="settings">
-        <label class="set-row">
-          <span class="set-cap" data-i18n="set.volume">громкость</span>
-          <input class="vol" type="range" min="0" max="100" step="1" value="80">
-        </label>
-        <button class="set-btn full-btn" type="button" data-i18n="set.fullscreen">во весь экран</button>
+      <div class="settings-block">
+        <div class="settings">
+          <label class="set-row">
+            <span class="set-cap" data-i18n="set.volume">громкость</span>
+            <input class="vol" type="range" min="0" max="100" step="1" value="80">
+          </label>
+          <button class="set-btn full-btn" type="button" data-i18n="set.fullscreen">во весь экран</button>
+        </div>
+        <div class="set-keys" data-i18n="hud.keys"></div>
       </div>
       <div class="pause-actions">
         <button id="pause-resume" class="pause-btn" type="button" data-i18n="pause.resume">продолжить</button>
@@ -64,13 +66,16 @@
         <div class="title-go" data-i18n="title.go">нажмите, чтобы начать</div>
       </div>
 
-      <div class="settings title-settings">
-        <label class="set-row">
-          <span class="set-cap" data-i18n="set.volume">громкость</span>
-          <input class="vol" type="range" min="0" max="100" step="1" value="80">
-        </label>
-        <button class="set-btn full-btn" type="button" data-i18n="set.fullscreen">во весь экран</button>
-        <button class="set-btn lang-btn" type="button" data-i18n="set.lang">english</button>
+      <div class="settings-block title-settings">
+        <div class="settings">
+          <label class="set-row">
+            <span class="set-cap" data-i18n="set.volume">громкость</span>
+            <input class="vol" type="range" min="0" max="100" step="1" value="80">
+          </label>
+          <button class="set-btn full-btn" type="button" data-i18n="set.fullscreen">во весь экран</button>
+          <button class="set-btn lang-btn" type="button" data-i18n="set.lang">english</button>
+        </div>
+        <div class="set-keys" data-i18n="hud.keys"></div>
       </div>
 
       <button id="change-name" class="link-btn" type="button" data-i18n="title.changeName" hidden>сменить имя</button>
@@ -78,9 +83,9 @@
   </div>
 
   <!-- ?v= — против кэша GitHub Pages (max-age=600): поднимать при правках -->
-  <script src="store.js?v=39"></script>
-  <script src="i18n.js?v=39"></script>
-  <script src="audio.js?v=39"></script>
-  <script src="game.js?v=39"></script>
+  <script src="store.js?v=40"></script>
+  <script src="i18n.js?v=40"></script>
+  <script src="audio.js?v=40"></script>
+  <script src="game.js?v=40"></script>
 </body>
 </html>
